@@ -118,4 +118,6 @@ class QuoteResponse(StrictModel):
     valor_total: float
     status: QuoteStatus
     criado_em: datetime
+    atualizado_em: datetime | None = None
+    observacoes: str | None = None
     mensagem_whatsapp: str

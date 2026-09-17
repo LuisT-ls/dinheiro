@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getQuotes, updateQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
+  import { deleteQuote, getQuotes, updateQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
 
   const statuses: { value: QuoteStatus; label: string }[] = [
@@ -15,6 +15,8 @@
   let loading = true;
   let error = '';
   let updatingId = '';
+  let deletingId = '';
+  let toast = '';
 
   onMount(loadQuotes);
 
@@ -72,6 +74,23 @@
     }
   }
 
+  async function removeQuote(quote: QuoteResponse) {
+    if (!window.confirm(`Deseja realmente excluir o orçamento de ${quote.cliente.nome}?`)) return;
+
+    deletingId = quote.id;
+    error = '';
+    try {
+      await deleteQuote(quote.id);
+      quotes = quotes.filter((item) => item.id !== quote.id);
+      toast = 'Orçamento removido com sucesso.';
+      window.setTimeout(() => (toast = ''), 3500);
+    } catch (reason) {
+      error = reason instanceof Error ? reason.message : 'Não foi possível excluir o orçamento.';
+    } finally {
+      deletingId = '';
+    }
+  }
+
   function whatsappUrl(quote: QuoteResponse) {
     const digits = (quote.cliente.telefone || '').replace(/\D/g, '');
     const phone = digits ? (digits.startsWith('55') ? digits : `55${digits}`) : '';
@@ -101,6 +120,7 @@
   </section>
 
   {#if error}<div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>{/if}
+  {#if toast}<div class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-xl">{toast}</div>{/if}
 
   <section class="surface overflow-hidden">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
@@ -129,9 +149,12 @@
               <select class="field min-w-36 py-2 text-xs font-bold" value={quote.status} aria-label={`Status de ${quote.cliente.nome}`} on:change={(event) => changeStatus(quote, event.currentTarget.value as QuoteStatus)} disabled={updatingId === quote.id}>
                 {#each statuses as status}<option value={status.value}>{status.label}</option>{/each}
               </select>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
+                <a href={`/?edit=${encodeURIComponent(quote.id)}`} class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700" title="Editar orçamento">✎ Editar</a>
+                <a href={`/?clone=${encodeURIComponent(quote.id)}`} class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700" title="Duplicar orçamento">⧉ Duplicar</a>
                 <button type="button" class="inline-flex items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100" on:click={() => gerarOrcamentoPDF(quote)} title="Baixar PDF">PDF</button>
                 <button type="button" class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={() => resendWhatsApp(quote)} disabled={!quote.cliente.telefone} title={quote.cliente.telefone ? 'Reenviar pelo WhatsApp' : 'Telefone não informado'}>↗ WhatsApp</button>
+                <button type="button" class="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50" on:click={() => removeQuote(quote)} disabled={deletingId === quote.id} title="Excluir orçamento">{deletingId === quote.id ? 'Excluindo…' : '⌫ Excluir'}</button>
               </div>
             </div>
           </article>

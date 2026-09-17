@@ -153,11 +153,49 @@ def _calculate_quote(
     )
 
 
+def _quote_payload(
+    quote: QuoteCreate,
+    response_items: list[QuoteItemResponse],
+    total_labor: float,
+    total_parts: float,
+    gross_subtotal: float,
+    total: float,
+    message: str,
+    status: str,
+    created_at: datetime,
+    updated_at: datetime | None = None,
+) -> dict:
+    payload = {
+        "cliente": quote.cliente.model_dump(mode="json"),
+        "itens": [
+            {
+                **item.model_dump(mode="json"),
+                "subtotal": response_item.subtotal,
+            }
+            for item, response_item in zip(quote.itens, response_items)
+        ],
+        "total_mao_de_obra": total_labor,
+        "total_pecas": total_parts,
+        "subtotal_bruto": gross_subtotal,
+        "desconto": _money(quote.desconto),
+        "taxa_deslocamento": _money(quote.taxa_deslocamento),
+        "valor_total": total,
+        "status": status,
+        "criado_em": created_at,
+        "observacoes": quote.observacoes,
+        "mensagem_whatsapp": message,
+    }
+    if updated_at is not None:
+        payload["atualizado_em"] = updated_at
+    return payload
+
+
 def _quote_from_snapshot(snapshot) -> QuoteResponse:
     data = snapshot.to_dict() or {}
     data["id"] = snapshot.id
     data.setdefault("status", QuoteStatus.RASCUNHO.value)
     data.setdefault("criado_em", getattr(snapshot, "create_time", _utc_now()))
+    data.setdefault("observacoes", None)
     data.setdefault("mensagem_whatsapp", "")
     return QuoteResponse.model_validate(data)
 
@@ -187,25 +225,17 @@ def create_quote(quote: QuoteCreate) -> QuoteResponse:
     created_at = _utc_now()
     document = database.collection(COLLECTION_NAME).document()
 
-    payload = {
-        "cliente": quote.cliente.model_dump(mode="json"),
-        "itens": [
-            {
-                **item.model_dump(mode="json"),
-                "subtotal": response_item.subtotal,
-            }
-            for item, response_item in zip(quote.itens, response_items)
-        ],
-        "total_mao_de_obra": total_labor,
-        "total_pecas": total_parts,
-        "subtotal_bruto": gross_subtotal,
-        "desconto": _money(quote.desconto),
-        "taxa_deslocamento": _money(quote.taxa_deslocamento),
-        "valor_total": total,
-        "status": QuoteStatus.RASCUNHO.value,
-        "criado_em": created_at,
-        "mensagem_whatsapp": message,
-    }
+    payload = _quote_payload(
+        quote,
+        response_items,
+        total_labor,
+        total_parts,
+        gross_subtotal,
+        total,
+        message,
+        QuoteStatus.RASCUNHO.value,
+        created_at,
+    )
 
     try:
         document.set(payload)
@@ -249,6 +279,76 @@ def get_quote(quote_id: str) -> QuoteResponse:
         raise
     except Exception as error:
         _raise_firestore_error("buscar o orçamento", error)
+
+
+@router.put("/{quote_id}", response_model=QuoteResponse)
+def update_quote(quote_id: str, quote: QuoteCreate) -> QuoteResponse:
+    """Recalculate and replace an existing quote while preserving its ID."""
+
+    database = _require_db()
+    document = database.collection(COLLECTION_NAME).document(quote_id)
+
+    try:
+        snapshot = document.get()
+        if not snapshot.exists:
+            raise HTTPException(status_code=404, detail="Orçamento não encontrado.")
+
+        current_data = snapshot.to_dict() or {}
+        (
+            response_items,
+            _labor_values,
+            total_labor,
+            total_parts,
+            gross_subtotal,
+            total,
+            message,
+        ) = _calculate_quote(quote)
+        created_at = current_data.get(
+            "criado_em",
+            getattr(snapshot, "create_time", _utc_now()),
+        )
+        updated_at = _utc_now()
+        payload = _quote_payload(
+            quote,
+            response_items,
+            total_labor,
+            total_parts,
+            gross_subtotal,
+            total,
+            message,
+            current_data.get("status", QuoteStatus.RASCUNHO.value),
+            created_at,
+            updated_at,
+        )
+        document.set(payload)
+        return QuoteResponse.model_validate({**payload, "id": document.id})
+    except HTTPException:
+        raise
+    except Exception as error:
+        _raise_firestore_error("atualizar o orçamento", error)
+
+
+@router.delete("/{quote_id}")
+def delete_quote(quote_id: str) -> dict[str, object]:
+    """Delete an existing quote from Firestore."""
+
+    database = _require_db()
+    document = database.collection(COLLECTION_NAME).document(quote_id)
+
+    try:
+        snapshot = document.get()
+        if not snapshot.exists:
+            raise HTTPException(status_code=404, detail="Orçamento não encontrado.")
+
+        document.delete()
+        return {
+            "success": True,
+            "message": "Orçamento removido com sucesso",
+        }
+    except HTTPException:
+        raise
+    except Exception as error:
+        _raise_firestore_error("remover o orçamento", error)
 
 
 @router.patch("/{quote_id}/status", response_model=QuoteResponse)

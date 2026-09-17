@@ -55,6 +55,8 @@ export interface QuoteResponse {
   valor_total: number;
   status: QuoteStatus;
   criado_em: string;
+  atualizado_em?: string | null;
+  observacoes?: string | null;
   mensagem_whatsapp: string;
 }
 
@@ -120,6 +122,23 @@ export function createQuote(quoteData: QuoteCreate): Promise<QuoteResponse> {
   return request<QuoteResponse>('/quotes', {
     method: 'POST',
     body: JSON.stringify(quoteData),
+  });
+}
+
+export function getQuote(id: string): Promise<QuoteResponse> {
+  return request<QuoteResponse>(`/quotes/${encodeURIComponent(id)}`);
+}
+
+export function updateQuote(id: string, quoteData: QuoteCreate): Promise<QuoteResponse> {
+  return request<QuoteResponse>(`/quotes/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(quoteData),
+  });
+}
+
+export async function deleteQuote(id: string): Promise<void> {
+  await request<{ success: boolean; message: string }>(`/quotes/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
   });
 }
 

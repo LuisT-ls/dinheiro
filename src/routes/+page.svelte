@@ -1,10 +1,13 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import {
     createQuote,
+    getQuote,
     getServices,
     parseClientRequest,
     seedServices,
+    updateQuote,
     type AIInterpretation,
     type ClientInfo,
     type QuoteCreate,
@@ -16,10 +19,12 @@
   type CategoryFilter = 'todos' | 'hardware' | 'dev' | 'infra';
   type QuoteDraft = {
     service: Service;
+    mao_de_obra: number;
     custo_peca: number;
     horas_estimadas: number | null;
     taxa_hora: number | null;
     margem_seguranca: number;
+    descricao_customizada: string | null;
   };
 
   const filters: { key: CategoryFilter; label: string }[] = [
@@ -33,6 +38,7 @@
   let selectedItems: QuoteDraft[] = [];
   let activeCategory: CategoryFilter = 'todos';
   let customer: ClientInfo = { nome: '', telefone: '', identificador_aparelho: '' };
+  let observations = '';
   let clientMessage = '';
   let discount = 0;
   let travelFee = 0;
@@ -46,6 +52,9 @@
   let toast = '';
   let aiResult: AIInterpretation | null = null;
   let savedQuote: QuoteResponse | null = null;
+  let draftMode: 'new' | 'edit' | 'clone' = 'new';
+  let draftSourceId = '';
+  let loadingDraft = false;
 
   $: filteredServices = services.filter(
     (service) => activeCategory === 'todos' || service.categoria === activeCategory,
@@ -56,7 +65,10 @@
   $: grossSubtotal = roundMoney(laborSubtotal + partsSubtotal);
   $: finalTotal = roundMoney(grossSubtotal + (Number(travelFee) || 0) - (Number(discount) || 0));
 
-  onMount(loadCatalog);
+  onMount(async () => {
+    await loadCatalog();
+    await loadDraftFromQuery();
+  });
 
   async function loadCatalog() {
     loadingServices = true;
@@ -105,11 +117,69 @@
   function draftFor(service: Service): QuoteDraft {
     return {
       service,
+      mao_de_obra: service.tipo_cobranca === 'hora' ? 0 : service.valor_base,
       custo_peca: 0,
       horas_estimadas: service.tipo_cobranca === 'hora' ? 1 : null,
       taxa_hora: service.tipo_cobranca === 'hora' ? service.valor_base : null,
       margem_seguranca: 1.25,
+      descricao_customizada: service.descricao_padrao,
     };
+  }
+
+  function draftFromQuoteItem(quote: QuoteResponse, item: QuoteResponse['itens'][number]): QuoteDraft {
+    const catalogService = services.find((service) => service.id === item.service_id);
+    const service: Service = catalogService ?? {
+      id: item.service_id,
+      nome: item.nome,
+      categoria: item.categoria ?? 'outros',
+      tipo_cobranca: item.horas_estimadas != null && item.taxa_hora != null ? 'hora' : 'fixo',
+      valor_base: item.mao_de_obra,
+      permite_peca: Number(item.custo_peca) > 0,
+      descricao_padrao: item.descricao_customizada ?? null,
+      criado_em: quote.criado_em,
+    };
+
+    return {
+      service,
+      mao_de_obra: service.tipo_cobranca === 'hora' ? 0 : item.mao_de_obra,
+      custo_peca: Number(item.custo_peca) || 0,
+      horas_estimadas: item.horas_estimadas,
+      taxa_hora: item.taxa_hora,
+      margem_seguranca: item.margem_seguranca ?? 1.25,
+      descricao_customizada: item.descricao_customizada ?? service.descricao_padrao,
+    };
+  }
+
+  async function loadDraftFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    const cloneId = params.get('clone');
+    const sourceId = editId || cloneId;
+    if (!sourceId) return;
+
+    loadingDraft = true;
+    pageError = '';
+    try {
+      const quote = await getQuote(sourceId);
+      customer = { ...quote.cliente };
+      observations = quote.observacoes ?? '';
+      discount = quote.desconto;
+      travelFee = quote.taxa_deslocamento;
+      selectedItems = quote.itens.map((item) => draftFromQuoteItem(quote, item));
+      draftMode = editId ? 'edit' : 'clone';
+      draftSourceId = sourceId;
+      savedQuote = editId ? quote : null;
+      toast = editId ? `Orçamento #${sourceId} carregado para edição.` : `Orçamento #${sourceId} duplicado.`;
+      window.setTimeout(() => (toast = ''), 3500);
+    } catch (error) {
+      pageError = errorMessage(error, 'Não foi possível carregar o orçamento.');
+    } finally {
+      loadingDraft = false;
+    }
+  }
+
+  function cancelDraft() {
+    goto('/');
   }
 
   function toggleService(service: Service) {
@@ -128,7 +198,7 @@
       const rate = Number(item.taxa_hora) || 0;
       return roundMoney(hours * rate * (Number(item.margem_seguranca) || 1.25));
     }
-    return Number(item.service.valor_base) || 0;
+    return Number(item.mao_de_obra) || 0;
   }
 
   async function analyzeWithAi() {
@@ -170,15 +240,16 @@
         service_id: item.service.id,
         nome: item.service.nome,
         categoria: item.service.categoria,
-        mao_de_obra: item.service.tipo_cobranca === 'hora' ? 0 : item.service.valor_base,
+        mao_de_obra: item.service.tipo_cobranca === 'hora' ? 0 : item.mao_de_obra,
         custo_peca: roundMoney(Number(item.custo_peca) || 0),
         horas_estimadas: item.horas_estimadas,
         taxa_hora: item.taxa_hora,
         margem_seguranca: item.margem_seguranca,
-        descricao_customizada: item.service.descricao_padrao,
+        descricao_customizada: item.descricao_customizada,
       })),
       desconto: roundMoney(Number(discount) || 0),
       taxa_deslocamento: roundMoney(Number(travelFee) || 0),
+      observacoes: observations.trim() || null,
     };
   }
 
@@ -195,7 +266,15 @@
     saving = true;
     saveError = '';
     try {
+      if (draftMode === 'edit' && draftSourceId) {
+        savedQuote = await updateQuote(draftSourceId, buildQuote());
+        await goto('/historico');
+        return;
+      }
+
       savedQuote = await createQuote(buildQuote());
+      draftMode = 'new';
+      draftSourceId = '';
       toast = 'Orçamento salvo com sucesso.';
       window.setTimeout(() => (toast = ''), 3500);
     } catch (error) {
@@ -234,10 +313,20 @@
 </svelte:head>
 
 <div class="space-y-8">
+  {#if draftMode !== 'new'}
+    <section class="flex flex-col justify-between gap-4 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+      <div>
+        <p class="eyebrow text-indigo-600">{draftMode === 'edit' ? 'Modo de edição' : 'Novo a partir de um existente'}</p>
+        <p class="mt-1 text-sm font-bold text-indigo-950">{draftMode === 'edit' ? `Editando Orçamento #${draftSourceId}` : `Duplicando Orçamento #${draftSourceId}`}</p>
+      </div>
+      <button type="button" class="rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100" on:click={cancelDraft}>Cancelar e voltar</button>
+    </section>
+  {/if}
+
   <section class="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
     <div>
       <p class="eyebrow">Workspace comercial</p>
-      <h1 class="mt-2 text-3xl font-extrabold tracking-[-0.055em] text-slate-950 sm:text-4xl">Novo orçamento</h1>
+      <h1 class="mt-2 text-3xl font-extrabold tracking-[-0.055em] text-slate-950 sm:text-4xl">{draftMode === 'edit' ? 'Editar orçamento' : draftMode === 'clone' ? 'Duplicar orçamento' : 'Novo orçamento'}</h1>
       <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Entenda o pedido, escolha os serviços e entregue um orçamento claro para o cliente.</p>
     </div>
     <a href="/docs" class="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 sm:self-auto">Abrir API <span aria-hidden="true">↗</span></a>
@@ -253,20 +342,20 @@
         <p class="eyebrow">01 · Contexto</p>
         <h2 class="mt-1 text-lg font-bold tracking-tight text-slate-900">Para quem é este orçamento?</h2>
       </div>
-      <span class="hidden rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-bold text-indigo-700 sm:inline-flex">Rascunho novo</span>
+      <span class="hidden rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-bold text-indigo-700 sm:inline-flex">{draftMode === 'edit' ? 'Edição' : draftMode === 'clone' ? 'Cópia' : 'Rascunho novo'}</span>
     </div>
     <div class="grid gap-4 md:grid-cols-3">
       <label>
         <span class="field-label">Nome do cliente</span>
-        <input class="field" bind:value={customer.nome} placeholder="Ex.: Ana Souza" />
+        <input class="field" bind:value={customer.nome} on:input={() => (savedQuote = null)} placeholder="Ex.: Ana Souza" />
       </label>
       <label>
         <span class="field-label">Telefone / WhatsApp</span>
-        <input class="field" bind:value={customer.telefone} inputmode="tel" placeholder="(71) 99999-0000" />
+        <input class="field" bind:value={customer.telefone} on:input={() => (savedQuote = null)} inputmode="tel" placeholder="(71) 99999-0000" />
       </label>
       <label>
         <span class="field-label">Aparelho ou projeto</span>
-        <input class="field" bind:value={customer.identificador_aparelho} placeholder="Ex.: MacBook Pro / Landing page" />
+        <input class="field" bind:value={customer.identificador_aparelho} on:input={() => (savedQuote = null)} placeholder="Ex.: MacBook Pro / Landing page" />
       </label>
     </div>
   </section>
@@ -390,6 +479,7 @@
             <label><span class="field-label">Desconto (R$)</span><input class="field" type="number" min="0" step="0.01" bind:value={discount} on:input={() => (savedQuote = null)} /></label>
             <label><span class="field-label">Deslocamento (R$)</span><input class="field" type="number" min="0" step="0.01" bind:value={travelFee} on:input={() => (savedQuote = null)} /></label>
           </div>
+          <label class="block"><span class="field-label">Observações / prazo</span><textarea class="field min-h-20 resize-y" bind:value={observations} on:input={() => (savedQuote = null)} placeholder="Prazo, condições ou observações para o cliente"></textarea></label>
           <div class="space-y-2 text-sm">
             <div class="flex justify-between gap-4 text-slate-500"><span>Mão de obra</span><span class="font-semibold text-slate-700">{money(laborSubtotal)}</span></div>
             <div class="flex justify-between gap-4 text-slate-500"><span>Peças</span><span class="font-semibold text-slate-700">{money(partsSubtotal)}</span></div>
@@ -400,7 +490,7 @@
         </div>
 
         {#if saveError}<p class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{saveError}</p>{/if}
-        <button type="button" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" on:click={saveQuote} disabled={saving || selectedItems.length === 0}>{saving ? 'Salvando…' : 'Salvar orçamento'}</button>
+        <button type="button" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" on:click={saveQuote} disabled={saving || loadingDraft || selectedItems.length === 0}>{saving ? (draftMode === 'edit' ? 'Atualizando…' : 'Gerando…') : draftMode === 'edit' ? 'Atualizar orçamento' : 'Gerar orçamento'}</button>
         <div class="grid grid-cols-2 gap-2">
           <button type="button" class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-40" on:click={() => savedQuote && gerarOrcamentoPDF(savedQuote)} disabled={!savedQuote}>Baixar PDF</button>
           <button type="button" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={copyWhatsApp} disabled={!savedQuote}>Copiar mensagem</button>
