@@ -222,3 +222,4 @@ node_modules/
 .svelte-kit/
 .vercel/
 dist/
+.env*
