@@ -56,6 +56,22 @@ class ServiceResponse(ServiceBase):
     criado_em: datetime
 
 
+class AIRequest(StrictModel):
+    mensagem: str = Field(..., min_length=1, max_length=5000)
+
+
+class SuggestedService(StrictModel):
+    service_id: str = Field(..., min_length=1, max_length=150)
+    nome: str = Field(..., min_length=1, max_length=150)
+    motivo: str = Field(..., min_length=1, max_length=500)
+
+
+class AIInterpretation(StrictModel):
+    resumo_problema: str = Field(..., min_length=1, max_length=1000)
+    servicos_sugeridos: list[SuggestedService] = Field(default_factory=list)
+    observacoes_tecnicas: str = Field(..., min_length=1, max_length=2000)
+
+
 class ClientInfo(StrictModel):
     nome: str = Field(..., min_length=1, max_length=150)
     telefone: str | None = Field(default=None, max_length=40)
