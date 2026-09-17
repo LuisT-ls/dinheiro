@@ -118,6 +118,19 @@ export function createService(service: ServiceCreate): Promise<Service> {
   });
 }
 
+export function updateService(id: string, service: ServiceCreate): Promise<Service> {
+  return request<Service>(`/services/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(service),
+  });
+}
+
+export async function deleteService(id: string): Promise<void> {
+  await request<{ message: string }>(`/services/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 export function createQuote(quoteData: QuoteCreate): Promise<QuoteResponse> {
   return request<QuoteResponse>('/quotes', {
     method: 'POST',
