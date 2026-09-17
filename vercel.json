@@ -1,10 +1,40 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "sveltekit",
+  "services": {
+    "frontend": {
+      "root": ".",
+      "framework": "sveltekit"
+    },
+    "backend": {
+      "root": ".",
+      "framework": "fastapi",
+      "entrypoint": "api.main:app"
+    }
+  },
   "rewrites": [
     {
+      "source": "/docs",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/openapi.json",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
       "source": "/api/(.*)",
-      "destination": "/api/main.py"
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
     }
   ]
 }
