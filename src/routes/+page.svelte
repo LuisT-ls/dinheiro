@@ -363,7 +363,7 @@
     <div class="metric-card"><span class="metric-icon bg-indigo-50 text-indigo-600">#</span><div><p class="metric-label">Serviços escolhidos</p><p class="metric-value">{selectedCount}</p><p class="metric-caption">de {services.length} disponíveis</p></div></div>
     <div class="metric-card"><span class="metric-icon bg-sky-50 text-sky-600">MO</span><div><p class="metric-label">Mão de obra</p><p class="metric-value text-lg">{money(laborSubtotal)}</p><p class="metric-caption">subtotal calculado</p></div></div>
     <div class="metric-card"><span class="metric-icon bg-amber-50 text-amber-600">◈</span><div><p class="metric-label">Peças</p><p class="metric-value text-lg">{money(partsSubtotal)}</p><p class="metric-caption">custos informados</p></div></div>
-    <div class="metric-card metric-card-highlight"><span class="metric-icon bg-indigo-600 text-white">R$</span><div><p class="metric-label text-indigo-200">Total estimado</p><p class="metric-value text-lg text-white">{money(finalTotal)}</p><p class="metric-caption text-indigo-200">atualizado em tempo real</p></div></div>
+    <div class="metric-card metric-card-highlight"><span class="metric-icon bg-indigo-600 text-white">R$</span><div><p class="metric-label text-indigo-700">Total estimado</p><p class="metric-value text-lg text-indigo-950">{money(finalTotal)}</p><p class="metric-caption text-indigo-600">atualizado em tempo real</p></div></div>
   </section>
 
   {#if toast}
@@ -486,10 +486,10 @@
     </section>
 
     <aside class="surface overflow-hidden lg:sticky lg:top-6">
-      <div class="border-b border-slate-100 bg-slate-950 p-5 text-white">
+      <div class="border-b border-indigo-500/30 bg-indigo-600 p-5 text-white">
         <div class="flex items-center justify-between gap-4">
-          <div><p class="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-300">04 · Resumo</p><h2 class="mt-1 text-lg font-bold">Orçamento atual</h2><p class="mt-1 text-xs text-slate-400">Revise os valores antes de salvar.</p></div>
-          <span class="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-slate-300">{selectedCount} {selectedCount === 1 ? 'item' : 'itens'}</span>
+          <div><p class="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-100">04 · Resumo</p><h2 class="mt-1 text-lg font-bold">Orçamento atual</h2><p class="mt-1 text-xs text-indigo-100">Revise os valores antes de salvar.</p></div>
+          <span class="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold text-indigo-50">{selectedCount} {selectedCount === 1 ? 'item' : 'itens'}</span>
         </div>
       </div>
       <div class="space-y-4 p-5">

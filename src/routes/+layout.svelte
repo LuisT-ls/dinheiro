@@ -14,6 +14,22 @@
 
   let accessReady = false;
   let accessConfigured = false;
+  let theme: 'light' | 'dark' = 'light';
+
+  function applyTheme(nextTheme: 'light' | 'dark') {
+    theme = nextTheme;
+    document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+    localStorage.setItem('dinheiro-theme', nextTheme);
+  }
+
+  function initializeTheme() {
+    const storedTheme = localStorage.getItem('dinheiro-theme');
+    applyTheme(storedTheme === 'dark' ? 'dark' : 'light');
+  }
+
+  function toggleTheme() {
+    applyTheme(theme === 'dark' ? 'light' : 'dark');
+  }
 
   function enforceAccess() {
     if (!browser) return;
@@ -33,7 +49,10 @@
   }
 
   if (browser) afterNavigate(enforceAccess);
-  onMount(enforceAccess);
+  onMount(() => {
+    initializeTheme();
+    enforceAccess();
+  });
 
   function logout() {
     revokeAccess();
@@ -42,7 +61,7 @@
 </script>
 
 <svelte:head>
-  <meta name="theme-color" content="#f8fafc" />
+  <meta name="theme-color" content={theme === 'dark' ? '#0b1120' : '#f8fafc'} />
 </svelte:head>
 
 {#if accessReady}
@@ -63,6 +82,7 @@
                 </a>
               {/each}
             </nav>
+            <button type="button" class="theme-toggle" on:click={toggleTheme} aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><span class="hidden sm:inline">{theme === 'dark' ? 'Claro' : 'Escuro'}</span></button>
             {#if accessConfigured}<button type="button" class="rounded-lg px-2.5 py-2 text-xs font-bold text-slate-400 transition hover:bg-rose-50 hover:text-rose-600" on:click={logout} title="Sair">Sair</button>{/if}
           </div>
         </div>
@@ -84,5 +104,9 @@
     background: white;
     color: #3730a3;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  }
+
+  .theme-toggle {
+    @apply inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
   }
 </style>
