@@ -82,6 +82,92 @@ html.dark .surface {
   box-shadow: 0 1px 3px rgba(2, 6, 23, 0.35) !important;
 }
 
+html.dark .metric-card,
+html.dark .service-card {
+  border-color: #263449 !important;
+  background: #111c30 !important;
+  box-shadow: 0 1px 3px rgba(2, 6, 23, 0.35) !important;
+}
+
+html.dark .metric-card-highlight {
+  border-color: #4f46e5 !important;
+  background: rgba(49, 46, 129, 0.34) !important;
+}
+
+html.dark .metric-label,
+html.dark .metric-caption {
+  color: #94a3b8 !important;
+}
+
+html.dark .metric-value {
+  color: #f1f5f9 !important;
+}
+
+html.dark .filter-pill {
+  color: #94a3b8 !important;
+}
+
+html.dark .filter-pill:hover {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .filter-active {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+html.dark .filter-count {
+  background: #263449 !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .filter-active .filter-count {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+}
+
+html.dark .card-action,
+html.dark .action-button,
+html.dark .theme-toggle {
+  border-color: #334155 !important;
+  background: #172236 !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .card-action:hover,
+html.dark .action-button:hover,
+html.dark .theme-toggle:hover {
+  border-color: #6366f1 !important;
+  background: #263449 !important;
+  color: #e0e7ff !important;
+}
+
+html.dark .action-primary {
+  border-color: #4f46e5 !important;
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+html.dark .action-pdf {
+  border-color: #6366f1 !important;
+  background: rgba(49, 46, 129, 0.34) !important;
+  color: #c7d2fe !important;
+}
+
+html.dark .action-whatsapp {
+  border-color: #047857 !important;
+  background: rgba(6, 95, 70, 0.3) !important;
+  color: #a7f3d0 !important;
+}
+
+html.dark .action-delete,
+html.dark .card-action-danger {
+  border-color: #9f1239 !important;
+  background: rgba(159, 18, 57, 0.28) !important;
+  color: #fda4af !important;
+}
+
 html.dark .field {
   border-color: #334155 !important;
   background: #0f172a !important;

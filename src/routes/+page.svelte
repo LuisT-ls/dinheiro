@@ -553,7 +553,7 @@
   }
 
   .metric-card-highlight {
-    @apply border-indigo-800 bg-slate-950;
+    @apply border-indigo-200 bg-indigo-50;
   }
 
   .metric-icon {
