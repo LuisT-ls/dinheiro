@@ -1,6 +1,10 @@
 import type { QuoteResponse, ServiceCategory } from './api';
 import type { jsPDF as JsPDF } from 'jspdf';
 
+const PROVIDER_NAME = 'LUÍS TEIXEIRA';
+const PROVIDER_SUBTITLE = 'SOLUÇÕES DIGITAIS & SUPORTE TÉCNICO';
+const FOOTER_LABEL = 'Proposta Comercial & Orçamento Técnico • Documento gerado digitalmente';
+
 const COLORS = {
   navy: { red: 15, green: 23, blue: 42 },
   indigo: { red: 79, green: 70, blue: 229 },
@@ -78,21 +82,15 @@ function addFooter(doc: JsPDF) {
     doc.setLineWidth(0.25);
     doc.line(18, 282, 192, 282);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(7.1);
     setText(doc, 'slate500');
-    doc.text('Dinheiro - proposta comercial', 18, 288);
+    doc.text(FOOTER_LABEL, 18, 288);
     doc.text(`Página ${page} de ${pages}`, 192, 288, { align: 'right' });
   }
 }
 
-function nextPageIfNeeded(doc: JsPDF, y: number, requiredSpace = 32) {
-  if (y + requiredSpace <= 270) return y;
-  doc.addPage();
-  return 24;
-}
-
 export async function gerarOrcamentoPDF(quote: QuoteResponse) {
-  const [{ default: JsPDFConstructor }, { default: autoTable }] = await Promise.all([
+  const [{ jsPDF: JsPDFConstructor }, { autoTable }] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
   ]);
@@ -105,73 +103,72 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
   doc.setProperties({
     title: `Orçamento ${quote.id}`,
     subject: 'Proposta comercial e orçamento técnico',
-    author: 'Dinheiro',
+    author: PROVIDER_NAME,
   });
 
-  // Executive header.
+  // Cabeçalho executivo compacto.
   setFill(doc, 'navy');
-  doc.rect(0, 0, pageWidth, 46, 'F');
+  doc.rect(0, 0, pageWidth, 42, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(19);
+  doc.setFontSize(16.5);
   setText(doc, 'white');
-  doc.text('Dinheiro', margin, 16);
+  doc.text(PROVIDER_NAME, margin, 15);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(7.7);
   doc.setTextColor(203, 213, 225);
-  doc.text('PROPOSTA COMERCIAL & ORÇAMENTO TÉCNICO', margin, 24);
+  doc.text(PROVIDER_SUBTITLE, margin, 22);
   doc.setDrawColor(COLORS.indigo.red, COLORS.indigo.green, COLORS.indigo.blue);
-  doc.setLineWidth(1.2);
-  doc.line(margin, 29, margin + 34, 29);
+  doc.setLineWidth(1.1);
+  doc.line(margin, 27, margin + 34, 27);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(12.5);
   setText(doc, 'white');
   doc.text(proposalNumber(quote.id), rightEdge, 14, { align: 'right' });
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.8);
   doc.setTextColor(203, 213, 225);
-  doc.text(`EMISSÃO  ${dateLabel(quote.criado_em)}`, rightEdge, 23, { align: 'right' });
-  doc.text(`VALIDADE  ${validityDateLabel(quote.criado_em)}`, rightEdge, 31, { align: 'right' });
+  doc.text(`EMISSÃO  ${dateLabel(quote.criado_em)}`, rightEdge, 22, { align: 'right' });
+  doc.text(`VALIDADE  ${validityDateLabel(quote.criado_em)}`, rightEdge, 29, { align: 'right' });
 
-  let y = 58;
+  let y = 53;
 
-  // Client information card.
+  // Card de dados do cliente.
   setText(doc, 'slate800');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.text('DADOS DO CLIENTE', margin, y);
   y += 5;
   setFill(doc, 'slate50');
-  doc.roundedRect(margin, y, contentWidth, 31, 3, 3, 'F');
+  doc.roundedRect(margin, y, contentWidth, 25, 3, 3, 'F');
   doc.setDrawColor(COLORS.slate200.red, COLORS.slate200.green, COLORS.slate200.blue);
   doc.setLineWidth(0.25);
-  doc.roundedRect(margin, y, contentWidth, 31, 3, 3, 'S');
+  doc.roundedRect(margin, y, contentWidth, 25, 3, 3, 'S');
 
   const clientX = margin + 7;
   const contactX = margin + 67;
   const projectX = margin + 119;
   const projectWidth = rightEdge - projectX - 7;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7.2);
   setText(doc, 'slate500');
-  doc.text('CLIENTE', clientX, y + 9);
-  doc.text('CONTATO', contactX, y + 9);
-  doc.text('PROJETO / EQUIPAMENTO', projectX, y + 9);
+  doc.text('CLIENTE', clientX, y + 8);
+  doc.text('CONTATO', contactX, y + 8);
+  doc.text('PROJETO / EQUIPAMENTO', projectX, y + 8);
 
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  setText(doc, 'slate800');
+  doc.text(quote.cliente.nome || 'Não informado', clientX, y + 16);
+  doc.text(quote.cliente.telefone || 'Não informado', contactX, y + 16);
+  const project = quote.cliente.identificador_aparelho || 'Não informado';
+  doc.text(doc.splitTextToSize(project, projectWidth).slice(0, 2), projectX, y + 16);
+  y += 35;
+
+  // Tabela de serviços.
+  setText(doc, 'slate800');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  setText(doc, 'slate800');
-  doc.text(quote.cliente.nome || 'Não informado', clientX, y + 18);
-  doc.text(quote.cliente.telefone || 'Não informado', contactX, y + 18);
-  const project = quote.cliente.identificador_aparelho || 'Não informado';
-  const projectLines = doc.splitTextToSize(project, projectWidth);
-  doc.text(projectLines.slice(0, 2), projectX, y + 18);
-  y += 43;
-
-  // Services table.
-  setText(doc, 'slate800');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
   doc.text('SERVIÇOS E ITENS DO ORÇAMENTO', margin, y);
   y += 4;
 
@@ -190,7 +187,7 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
     styles: {
       font: 'helvetica',
       fontSize: 8.5,
-      cellPadding: { top: 6, right: 4, bottom: 6, left: 4 },
+      cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
       textColor: [30, 41, 59],
       lineColor: [226, 232, 240],
       lineWidth: 0.2,
@@ -202,27 +199,19 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
       fontStyle: 'bold',
       fontSize: 8.5,
       halign: 'left',
-      cellPadding: { top: 5, right: 4, bottom: 5, left: 4 },
+      cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
     },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: {
-      0: { cellWidth: 61, fontStyle: 'bold' },
-      1: { cellWidth: 27, halign: 'center' },
+      0: { cellWidth: 59, fontStyle: 'bold' },
+      1: { cellWidth: 26, halign: 'center' },
       2: { cellWidth: 28, halign: 'right' },
       3: { cellWidth: 28, halign: 'right' },
-      4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+      4: { cellWidth: 29, halign: 'right', fontStyle: 'bold' },
     },
   });
 
-  const tableEnd = (doc as JsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 20;
-  y = nextPageIfNeeded(doc, tableEnd + 12, 55);
-
-  // Financial summary aligned to the right.
-  setText(doc, 'slate800');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('RESUMO FINANCEIRO', rightEdge, y, { align: 'right' });
-  y += 7;
+  const tableEnd = (doc as JsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 16;
 
   const summaryRows: Array<{ label: string; value: string; color?: keyof typeof COLORS }> = [
     { label: 'Subtotal serviços', value: money(quote.total_mao_de_obra) },
@@ -235,96 +224,116 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
     summaryRows.push({ label: 'Desconto', value: `- ${money(quote.desconto)}`, color: 'red600' });
   }
 
-  const summaryLeft = 117;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  for (const row of summaryRows) {
-    setText(doc, 'slate500');
-    doc.text(row.label, summaryLeft, y);
-    setText(doc, row.color ?? 'slate800');
-    doc.text(row.value, rightEdge, y, { align: 'right' });
-    y += 6;
+  // O resumo começa abaixo da tabela e fica isolado na lateral direita.
+  let finalY = tableEnd + 4;
+  if (finalY > 230) {
+    doc.addPage();
+    finalY = 24;
   }
 
-  setFill(doc, 'navy');
-  doc.roundedRect(summaryLeft - 5, y - 2, rightEdge - summaryLeft + 5, 16, 2, 2, 'F');
+  const summaryStartX = 120;
+  const summaryWidth = rightEdge - summaryStartX;
+  const summaryHeight = 9 + summaryRows.length * 4.8 + 13;
+  setFill(doc, 'slate50');
+  doc.roundedRect(summaryStartX, finalY, summaryWidth, summaryHeight, 2.5, 2.5, 'F');
+  doc.setDrawColor(COLORS.slate200.red, COLORS.slate200.green, COLORS.slate200.blue);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(summaryStartX, finalY, summaryWidth, summaryHeight, 2.5, 2.5, 'S');
+  setText(doc, 'slate800');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  setText(doc, 'white');
-  doc.text('VALOR TOTAL', summaryLeft, y + 8);
-  doc.text(money(quote.valor_total), rightEdge - 5, y + 8, { align: 'right' });
-  y += 29;
+  doc.setFontSize(8.2);
+  doc.text('RESUMO FINANCEIRO', summaryStartX + 5, finalY + 7);
 
-  // Commercial terms and signature area.
-  y = nextPageIfNeeded(doc, y, 73);
+  y = finalY + 13;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.8);
+  for (const row of summaryRows) {
+    setText(doc, 'slate500');
+    doc.text(row.label, summaryStartX + 5, y);
+    setText(doc, row.color ?? 'slate800');
+    doc.text(row.value, rightEdge - 5, y, { align: 'right' });
+    y += 4.8;
+  }
+
+  const totalY = finalY + summaryHeight - 13;
+  setFill(doc, 'navy');
+  doc.roundedRect(summaryStartX, totalY, summaryWidth, 13, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  setText(doc, 'white');
+  doc.text('VALOR TOTAL', summaryStartX + 5, totalY + 8.2);
+  doc.text(money(quote.valor_total), rightEdge - 5, totalY + 8.2, { align: 'right' });
+
+  // Condições compactas, mantidas na mesma página sempre que o finalY permitir.
+  y = finalY + summaryHeight + 6;
   doc.setDrawColor(COLORS.slate200.red, COLORS.slate200.green, COLORS.slate200.blue);
   doc.setLineWidth(0.25);
   doc.line(margin, y, rightEdge, y);
-  y += 8;
+  y += 5;
   setText(doc, 'slate800');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(8.8);
   doc.text('CONDIÇÕES GERAIS E GARANTIA', margin, y);
-  y += 6;
+  y += 5;
 
   const cardGap = 6;
   const cardWidth = (contentWidth - cardGap) / 2;
-  const cardHeight = 43;
+  const cardHeight = 29;
   const termsCards = [
     {
       x: margin,
       title: 'PRAZOS E PAGAMENTO',
       lines: [
-        'Prazo de execução e entrega: conforme escopo e agenda aprovados.',
-        'Condição padrão: 50% de entrada e 50% na aprovação final.',
+        'Execução e entrega conforme escopo e agenda aprovados.',
+        'Pagamento padrão: 50% de entrada e 50% na aprovação final.',
       ],
     },
     {
       x: margin + cardWidth + cardGap,
       title: 'GARANTIA TÉCNICA',
       lines: [
-        'Hardware: 90 dias sobre a mão de obra, conforme CDC e condições acordadas.',
-        'Desenvolvimento: 30 dias de suporte para ajustes pós-deploy dentro do escopo aprovado.',
+        'Hardware: 90 dias sobre a mão de obra, conforme CDC.',
+        'Dev: 30 dias de suporte para ajustes pós-deploy dentro do escopo.',
       ],
     },
   ];
 
   for (const card of termsCards) {
     setFill(doc, 'slate50');
-    doc.roundedRect(card.x, y, cardWidth, cardHeight, 3, 3, 'F');
+    doc.roundedRect(card.x, y, cardWidth, cardHeight, 2.5, 2.5, 'F');
     doc.setDrawColor(COLORS.slate200.red, COLORS.slate200.green, COLORS.slate200.blue);
-    doc.roundedRect(card.x, y, cardWidth, cardHeight, 3, 3, 'S');
+    doc.roundedRect(card.x, y, cardWidth, cardHeight, 2.5, 2.5, 'S');
     setText(doc, 'indigo');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.text(card.title, card.x + 6, y + 9);
+    doc.setFontSize(7.2);
+    doc.text(card.title, card.x + 5, y + 7);
     setText(doc, 'slate500');
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
-    let cardY = y + 17;
+    doc.setFontSize(7.1);
+    let cardY = y + 13;
     for (const line of card.lines) {
-      const wrapped = doc.splitTextToSize(`- ${line}`, cardWidth - 12);
-      doc.text(wrapped, card.x + 6, cardY);
-      cardY += wrapped.length * 3.7 + 3;
+      const wrapped = doc.splitTextToSize(`- ${line}`, cardWidth - 10);
+      doc.text(wrapped, card.x + 5, cardY);
+      cardY += wrapped.length * 3.2 + 2;
     }
   }
 
-  y += cardHeight + 12;
-  y = nextPageIfNeeded(doc, y, 28);
+  // Assinatura horizontal, sem bloco vertical adicional.
+  y += cardHeight + 8;
   setText(doc, 'slate800');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(7.8);
   doc.text('ASSINATURA / APROVAÇÃO', margin, y);
-  y += 14;
+  y += 9;
   doc.setDrawColor(COLORS.slate500.red, COLORS.slate500.green, COLORS.slate500.blue);
   doc.setLineWidth(0.25);
-  doc.line(margin, y, margin + 82, y);
-  doc.line(margin + 98, y, rightEdge, y);
+  doc.line(margin, y, margin + 77, y);
+  doc.line(margin + 97, y, rightEdge, y);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7.2);
   setText(doc, 'slate500');
-  doc.text('Nome e assinatura do cliente', margin, y + 5);
-  doc.text('Data', margin + 98, y + 5);
+  doc.text('Prestador de Serviços', margin, y + 4.5);
+  doc.text('Aceite do Cliente (Nome e Assinatura)', margin + 97, y + 4.5);
 
   addFooter(doc);
   doc.save(`orcamento-${slug(quote.cliente.nome)}-${fileDate(quote.criado_em)}.pdf`);
