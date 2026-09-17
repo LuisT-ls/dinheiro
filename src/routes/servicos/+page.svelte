@@ -249,8 +249,8 @@
       <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Organize sua vitrine técnica e encontre qualquer item em segundos ao montar um orçamento.</p>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a href="/" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700">← Voltar ao orçamento</a>
-      <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700" on:click={startCreate}>+ Novo serviço</button>
+      <a href="/" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700">← Voltar ao orçamento</a>
+      <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-700" on:click={startCreate}>+ Novo serviço</button>
     </div>
   </section>
 
@@ -297,7 +297,7 @@
           {/each}
         </div>
       {:else if services.length === 0}
-        <div class="p-10 text-center"><div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-indigo-50 text-xl text-indigo-600">✦</div><h3 class="mt-4 font-bold text-slate-900">Seu catálogo está vazio</h3><p class="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">Comece com os serviços padrão ou cadastre um item personalizado para montar seus orçamentos mais rápido.</p><div class="mt-5 flex flex-wrap justify-center gap-2"><button type="button" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-100 transition hover:bg-indigo-700 disabled:opacity-60" on:click={loadDefaultCatalog} disabled={seeding}>{seeding ? 'Carregando…' : 'Carregar catálogo padrão'}</button><button type="button" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700" on:click={startCreate}>Cadastrar manualmente</button></div></div>
+        <div class="p-10 text-center"><div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-indigo-50 text-xl text-indigo-600">✦</div><h3 class="mt-4 font-bold text-slate-900">Seu catálogo está vazio</h3><p class="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">Comece com os serviços padrão ou cadastre um item personalizado para montar seus orçamentos mais rápido.</p><div class="mt-5 flex flex-wrap justify-center gap-2"><button type="button" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60" on:click={loadDefaultCatalog} disabled={seeding}>{seeding ? 'Carregando…' : 'Carregar catálogo padrão'}</button><button type="button" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700" on:click={startCreate}>Cadastrar manualmente</button></div></div>
       {:else if filteredServices.length === 0}
         <div class="p-10 text-center"><div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-xl text-slate-500">⌕</div><h3 class="mt-4 font-bold text-slate-900">Nenhum serviço encontrado</h3><p class="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">Tente outro termo ou remova os filtros para ver todo o catálogo.</p><button type="button" class="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700" on:click={clearFilters}>Limpar filtros</button></div>
       {:else}
@@ -332,7 +332,7 @@
 
         <div class="rounded-2xl bg-slate-50 px-4 py-3"><p class="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">Prévia no orçamento</p><div class="mt-2 flex items-center justify-between gap-3"><p class="truncate text-sm font-bold text-slate-800">{form.nome.trim() || 'Nome do serviço'}</p><p class="shrink-0 text-sm font-black text-indigo-700">{form.tipo_cobranca === 'hora' ? `${money(Number(form.valor_base) || 0)}/h` : money(Number(form.valor_base) || 0)}</p></div><p class="mt-1 text-xs text-slate-500">{pricingLabel(form.tipo_cobranca)}{form.permite_peca ? ' · aceita custo de peça' : ''}</p></div>
 
-        <button type="submit" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={saving}>{saving ? 'Salvando…' : editingId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
+        <button type="submit" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={saving}>{saving ? 'Salvando…' : editingId ? 'Salvar alterações' : 'Adicionar ao catálogo'}</button>
       </form>
     </section>
   </div>
@@ -364,7 +364,7 @@
   }
 
   .filter-active {
-    @apply bg-slate-900 text-white shadow-sm hover:bg-slate-800 hover:text-white;
+    @apply bg-slate-900 text-white hover:bg-slate-800 hover:text-white;
   }
 
   .filter-count {

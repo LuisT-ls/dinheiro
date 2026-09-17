@@ -356,7 +356,7 @@
       <h1 class="mt-2 text-3xl font-extrabold tracking-[-0.055em] text-slate-950 sm:text-4xl">{draftMode === 'edit' ? 'Editar orçamento' : draftMode === 'clone' ? 'Duplicar orçamento' : 'Novo orçamento'}</h1>
       <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Entenda o pedido, escolha os serviços e entregue um orçamento claro para o cliente.</p>
     </div>
-    <a href="/docs" class="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 sm:self-auto">Abrir API <span aria-hidden="true">↗</span></a>
+    <a href="/docs" class="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700 sm:self-auto">Abrir API <span aria-hidden="true">↗</span></a>
   </section>
 
   <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo do orçamento atual">
@@ -414,7 +414,7 @@
             <textarea class="field min-h-[108px] resize-y" maxlength="1600" bind:value={clientMessage} placeholder="Ex.: Meu PC está esquentando, travando e quero colocar um SSD mais rápido..."></textarea>
             <span class="mt-1 block text-right text-[11px] text-slate-400">{clientMessage.length}/1600</span>
           </label>
-          <button type="button" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" on:click={analyzeWithAi} aria-busy={analyzing} disabled={analyzing || loadingServices}>
+          <button type="button" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" on:click={analyzeWithAi} aria-busy={analyzing} disabled={analyzing || loadingServices}>
             {#if analyzing}<span class="animate-pulse">Analisando…</span>{:else}<span>✦ Analisar com IA</span>{/if}
           </button>
         </div>
@@ -535,7 +535,7 @@
 
         {#if saveError}<p class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{saveError}</p>{/if}
         {#if !customerReady && selectedCount > 0}<p class="text-center text-[11px] leading-4 text-amber-600">Informe o nome do cliente para liberar o salvamento.</p>{/if}
-        <button type="button" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" on:click={saveQuote} disabled={saving || loadingDraft || selectedItems.length === 0}>{saving ? (draftMode === 'edit' ? 'Atualizando…' : 'Gerando…') : draftMode === 'edit' ? 'Atualizar orçamento' : 'Gerar orçamento'}</button>
+        <button type="button" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" on:click={saveQuote} disabled={saving || loadingDraft || selectedItems.length === 0}>{saving ? (draftMode === 'edit' ? 'Atualizando…' : 'Gerando…') : draftMode === 'edit' ? 'Atualizar orçamento' : 'Gerar orçamento'}</button>
         <div class="grid grid-cols-2 gap-2">
           <button type="button" class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-40" on:click={() => savedQuote && gerarOrcamentoPDF(savedQuote)} disabled={!savedQuote}>Baixar PDF</button>
           <button type="button" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={copyWhatsApp} disabled={!savedQuote}>Copiar mensagem</button>
@@ -581,7 +581,7 @@
   }
 
   .filter-active {
-    @apply bg-slate-900 text-white shadow-sm hover:bg-slate-800 hover:text-white;
+    @apply bg-slate-900 text-white hover:bg-slate-800 hover:text-white;
   }
 
   .filter-count {
@@ -593,10 +593,10 @@
   }
 
   .service-card {
-    @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2;
+    @apply rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-indigo-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2;
   }
 
   .service-card-selected {
-    @apply border-indigo-400 bg-indigo-50/70 shadow-sm shadow-indigo-100;
+    @apply border-indigo-400 bg-indigo-50/70;
   }
 </style>

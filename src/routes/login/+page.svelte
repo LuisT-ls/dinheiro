@@ -47,11 +47,11 @@
         <form class="mt-6 space-y-3 text-left" on:submit|preventDefault={submit}>
           <label><span class="field-label">PIN de acesso</span><input class="field text-center text-lg tracking-[0.3em]" type="password" inputmode="numeric" autocomplete="current-password" bind:value={pin} placeholder="••••" /></label>
           {#if error}<p class="text-center text-sm font-semibold text-rose-600">{error}</p>{/if}
-          <button type="submit" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700">Entrar no workspace</button>
+          <button type="submit" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Entrar no workspace</button>
         </form>
       {:else}
         <p class="mt-2 text-sm leading-6 text-slate-500">A proteção está desativada porque <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">APP_ACCESS_PIN</code> ainda não foi configurada.</p>
-        <button type="button" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700" on:click={submit}>Continuar</button>
+        <button type="button" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700" on:click={submit}>Continuar</button>
       {/if}
     </section>
   </div>

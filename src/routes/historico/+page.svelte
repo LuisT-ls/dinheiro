@@ -179,7 +179,7 @@
       <h1 class="mt-2 text-3xl font-extrabold tracking-[-0.055em] text-slate-950 sm:text-4xl">Histórico de orçamentos</h1>
       <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Encontre rapidamente uma proposta, acompanhe a negociação e retome o próximo passo.</p>
     </div>
-    <a href="/" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:bg-indigo-700"> <span class="text-base leading-none">+</span> Novo orçamento</a>
+    <a href="/" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-bold text-white transition hover:-translate-y-0.5 hover:bg-indigo-700"> <span class="text-base leading-none">+</span> Novo orçamento</a>
   </section>
 
   {#if error}<div class="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"><span class="mt-0.5">!</span><span>{error}</span></div>{/if}
@@ -233,7 +233,7 @@
         {/each}
       </div>
     {:else if quotes.length === 0}
-      <div class="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center"><span class="grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-2xl text-indigo-500">▤</span><p class="mt-4 font-bold text-slate-800">Seu histórico está pronto para começar</p><p class="mt-1 max-w-sm text-sm leading-6 text-slate-500">Crie o primeiro orçamento e acompanhe tudo por aqui.</p><a href="/" class="mt-5 inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-200 hover:bg-indigo-700">Criar primeiro orçamento</a></div>
+      <div class="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center"><span class="grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-2xl text-indigo-500">▤</span><p class="mt-4 font-bold text-slate-800">Seu histórico está pronto para começar</p><p class="mt-1 max-w-sm text-sm leading-6 text-slate-500">Crie o primeiro orçamento e acompanhe tudo por aqui.</p><a href="/" class="mt-5 inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700">Criar primeiro orçamento</a></div>
     {:else if filteredQuotes.length === 0}
       <div class="flex min-h-60 flex-col items-center justify-center px-6 py-12 text-center"><span class="grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-xl text-slate-400">⌕</span><p class="mt-4 font-bold text-slate-800">Nenhum orçamento encontrado</p><p class="mt-1 max-w-sm text-sm leading-6 text-slate-500">Tente outro termo de busca ou remova o filtro de status.</p><button type="button" class="mt-4 text-xs font-bold text-indigo-600 hover:text-indigo-800" on:click={clearFilters}>Limpar filtros</button></div>
     {:else}
@@ -293,7 +293,7 @@
   }
 
   .filter-active {
-    @apply bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white;
+    @apply bg-slate-900 text-white hover:bg-slate-900 hover:text-white;
   }
 
   .filter-active span:last-child {
@@ -305,7 +305,7 @@
   }
 
   .action-primary {
-    @apply border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-200 hover:border-indigo-700 hover:bg-indigo-700 hover:text-white;
+    @apply border-indigo-600 bg-indigo-600 text-white hover:border-indigo-700 hover:bg-indigo-700 hover:text-white;
   }
 
   .action-pdf {
