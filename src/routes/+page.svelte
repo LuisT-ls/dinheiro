@@ -11,6 +11,7 @@
     type QuoteResponse,
     type Service,
   } from '$lib/api';
+  import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
 
   type CategoryFilter = 'todos' | 'hardware' | 'dev' | 'infra';
   type QuoteDraft = {
@@ -168,6 +169,7 @@
       itens: selectedItems.map((item) => ({
         service_id: item.service.id,
         nome: item.service.nome,
+        categoria: item.service.categoria,
         mao_de_obra: item.service.tipo_cobranca === 'hora' ? 0 : item.service.valor_base,
         custo_peca: roundMoney(Number(item.custo_peca) || 0),
         horas_estimadas: item.horas_estimadas,
@@ -400,8 +402,9 @@
         {#if saveError}<p class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{saveError}</p>{/if}
         <button type="button" class="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" on:click={saveQuote} disabled={saving || selectedItems.length === 0}>{saving ? 'Salvando…' : 'Salvar orçamento'}</button>
         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-40" on:click={() => savedQuote && gerarOrcamentoPDF(savedQuote)} disabled={!savedQuote}>Baixar PDF</button>
           <button type="button" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={copyWhatsApp} disabled={!savedQuote}>Copiar mensagem</button>
-          <button type="button" class="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={openWhatsApp} disabled={!savedQuote || !savedQuote.cliente.telefone}>Abrir WhatsApp</button>
+          <button type="button" class="col-span-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={openWhatsApp} disabled={!savedQuote || !savedQuote.cliente.telefone}>Abrir WhatsApp</button>
         </div>
         {#if savedQuote && !savedQuote.cliente.telefone}<p class="text-center text-[11px] leading-4 text-amber-600">Adicione um telefone para abrir a conversa automaticamente.</p>{/if}
       </div>

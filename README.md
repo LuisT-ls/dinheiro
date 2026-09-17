@@ -20,10 +20,23 @@ curl -X POST http://localhost:8000/api/ai/parse-request \
   -d '{"mensagem":"Meu PC está esquentando, travando e quero colocar um SSD mais rápido"}'
 ```
 
+## Frontend
+
+```bash
+npm install
+npm run dev
+```
+
+O Vite encaminha `/api` para `http://127.0.0.1:8000` durante o desenvolvimento.
+Para ativar o acesso pessoal, configure `APP_ACCESS_PIN` antes do build/deploy
+na Vercel. O PIN é embutido no bundle do frontend e a sessão fica salva no
+`localStorage`; isso é uma proteção simples para uso pessoal, não uma autenticação
+forte para dados sensíveis.
+
 ## Git
 
 ```bash
 git add .
-git commit -m "feat(api): complete sprint 1 & 2 - backend core, schemas, firestore crud and quote engine"
+git commit -m "feat: add client-side PDF export and PIN access guard"
 git push origin main
 ```

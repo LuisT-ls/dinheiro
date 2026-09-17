@@ -81,6 +81,7 @@ class ClientInfo(StrictModel):
 class QuoteItemInput(StrictModel):
     service_id: str = Field(..., min_length=1, max_length=150)
     nome: str = Field(..., min_length=1, max_length=200)
+    categoria: ServiceCategory | None = None
     mao_de_obra: float = Field(..., ge=0)
     custo_peca: float = Field(default=0.0, ge=0)
     horas_estimadas: float | None = Field(default=None, ge=0)

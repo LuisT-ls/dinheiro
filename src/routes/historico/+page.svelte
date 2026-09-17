@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getQuotes, updateQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
+  import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
 
   const statuses: { value: QuoteStatus; label: string }[] = [
     { value: 'rascunho', label: 'Rascunho' },
@@ -128,7 +129,10 @@
               <select class="field min-w-36 py-2 text-xs font-bold" value={quote.status} aria-label={`Status de ${quote.cliente.nome}`} on:change={(event) => changeStatus(quote, event.currentTarget.value as QuoteStatus)} disabled={updatingId === quote.id}>
                 {#each statuses as status}<option value={status.value}>{status.label}</option>{/each}
               </select>
-              <button type="button" class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={() => resendWhatsApp(quote)} disabled={!quote.cliente.telefone} title={quote.cliente.telefone ? 'Reenviar pelo WhatsApp' : 'Telefone não informado'}>↗ WhatsApp</button>
+              <div class="flex gap-2">
+                <button type="button" class="inline-flex items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100" on:click={() => gerarOrcamentoPDF(quote)} title="Baixar PDF">PDF</button>
+                <button type="button" class="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={() => resendWhatsApp(quote)} disabled={!quote.cliente.telefone} title={quote.cliente.telefone ? 'Reenviar pelo WhatsApp' : 'Telefone não informado'}>↗ WhatsApp</button>
+              </div>
             </div>
           </article>
         {/each}

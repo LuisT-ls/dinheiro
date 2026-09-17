@@ -22,6 +22,7 @@ export interface ClientInfo {
 export interface QuoteItemInput {
   service_id: string;
   nome: string;
+  categoria?: ServiceCategory | null;
   mao_de_obra: number;
   custo_peca?: number;
   horas_estimadas?: number | null;
