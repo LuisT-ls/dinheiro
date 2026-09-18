@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { DEFAULT_BUSINESS_SETTINGS, getBusinessSettings, resetBusinessSettings, saveBusinessSettings, type BusinessSettings } from '$lib/settings';
+  import Seo from '$lib/Seo.svelte';
 
   let form: BusinessSettings = { ...DEFAULT_BUSINESS_SETTINGS };
   let saved = '';
@@ -24,10 +25,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>Configurações — Dinheiro</title>
-  <meta name="description" content="Personalize os dados comerciais usados nas suas propostas." />
-</svelte:head>
+<Seo title="Configurações comerciais | Dinheiro" description="Personalize identidade, validade, pagamento e garantias das suas propostas." />
 
 <div class="space-y-7">
   <section class="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">

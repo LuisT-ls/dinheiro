@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getQuotes, type QuoteResponse, type QuoteStatus } from '$lib/api';
+  import Seo from '$lib/Seo.svelte';
 
   const pipelineStatuses: { value: QuoteStatus; label: string; dot: string }[] = [
     { value: 'rascunho', label: 'Rascunhos', dot: 'bg-slate-400' },
@@ -93,10 +94,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>Painel financeiro — Dinheiro</title>
-  <meta name="description" content="Acompanhe valor vendido, conversão, margem e evolução das suas propostas." />
-</svelte:head>
+<Seo title="Painel financeiro | Dinheiro" description="Acompanhe valor em propostas, conversão, margem e evolução do seu pipeline comercial." />
 
 <div class="space-y-7 pb-4">
   <section class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">

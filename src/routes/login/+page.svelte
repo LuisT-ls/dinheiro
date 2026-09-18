@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { grantAccess, hasAccess, isAccessPinConfigured, verifyAccessPin } from '$lib/auth';
+  import Seo from '$lib/Seo.svelte';
 
   let pin = '';
   let error = '';
@@ -31,10 +32,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>Acesso — Dinheiro</title>
-  <meta name="description" content="Acesso protegido ao workspace de orçamentos." />
-</svelte:head>
+<Seo title="Acesso ao workspace | Dinheiro" description="Acesso protegido ao workspace pessoal de orçamentos técnicos." />
 
 {#if ready}
   <div class="mx-auto flex min-h-[calc(100vh-12rem)] max-w-md items-center justify-center py-10">

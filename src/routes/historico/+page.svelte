@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { deleteQuote, getQuotes, updateQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
+  import Seo from '$lib/Seo.svelte';
 
   type FilterStatus = QuoteStatus | 'todos';
 
@@ -184,10 +185,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>Histórico — Dinheiro</title>
-  <meta name="description" content="Acompanhe seus orçamentos e atualize o status de cada negociação." />
-</svelte:head>
+<Seo title="Histórico de orçamentos | Dinheiro" description="Acompanhe propostas, negociações, status e próximos passos em um só lugar." />
 
 <div class="space-y-7 pb-4">
   <section class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">

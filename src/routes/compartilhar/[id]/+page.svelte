@@ -4,6 +4,7 @@
   import { getQuote, updateQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
   import { getBusinessSettings, type BusinessSettings } from '$lib/settings';
+  import Seo from '$lib/Seo.svelte';
 
   let quote: QuoteResponse | null = null;
   let business: BusinessSettings = getBusinessSettings();
@@ -49,10 +50,11 @@
   }
 </script>
 
-<svelte:head>
-  <title>{quote ? `Proposta para ${quote.cliente.nome}` : 'Proposta comercial'} — {business.nome}</title>
-  <meta name="description" content="Visualização compartilhável de uma proposta comercial." />
-</svelte:head>
+<Seo
+  title={quote ? `Proposta para ${quote.cliente.nome} | ${business.nome}` : `Proposta comercial | ${business.nome}`}
+  description={quote ? `Proposta comercial de ${business.nome} para ${quote.cliente.nome}.` : 'Visualização compartilhável de uma proposta comercial.'}
+  type="article"
+/>
 
 {#if loading}
   <div class="flex min-h-[60vh] items-center justify-center text-sm text-slate-500"><span class="animate-pulse">Carregando proposta…</span></div>

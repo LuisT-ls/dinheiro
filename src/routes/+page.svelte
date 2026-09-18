@@ -18,6 +18,7 @@
   import { clearSavedQuoteDraft, loadSavedQuoteDraft, saveQuoteDraft, type SavedQuoteDraft } from '$lib/drafts';
   import { listQuoteTemplates, removeQuoteTemplate, saveQuoteTemplate, type QuoteTemplate } from '$lib/templates';
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
+  import Seo from '$lib/Seo.svelte';
 
   type CategoryFilter = 'todos' | 'hardware' | 'dev' | 'infra' | 'outros';
   type QuoteDraft = {
@@ -503,10 +504,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>Novo orçamento — Dinheiro</title>
-  <meta name="description" content="Monte e envie orçamentos técnicos em poucos minutos." />
-</svelte:head>
+<Seo title="Novo orçamento | Dinheiro" description="Monte, revise e compartilhe orçamentos técnicos em poucos minutos." />
 
 <div class="space-y-8">
   {#if draftMode !== 'new'}

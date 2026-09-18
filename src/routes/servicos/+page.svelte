@@ -11,6 +11,7 @@
     type ServiceCategory,
     type ServiceCreate,
   } from '$lib/api';
+  import Seo from '$lib/Seo.svelte';
 
   type CategoryFilter = ServiceCategory | 'todos';
 
@@ -240,10 +241,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>Catálogo de serviços — Dinheiro</title>
-  <meta name="description" content="Cadastre e organize os serviços usados nos seus orçamentos." />
-</svelte:head>
+<Seo title="Catálogo de serviços | Dinheiro" description="Gerencie serviços, preços, custos internos e categorias usados nos seus orçamentos." />
 
 <div class="space-y-7">
   <section class="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
