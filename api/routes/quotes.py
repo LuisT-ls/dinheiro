@@ -105,24 +105,29 @@ def _whatsapp_message(
 
 def _calculate_quote(
     quote: QuoteCreate,
-) -> tuple[list[QuoteItemResponse], list[float], float, float, float, float, str]:
+) -> tuple[list[QuoteItemResponse], list[float], float, float, float, float, str, float]:
     response_items: list[QuoteItemResponse] = []
     labor_values: list[float] = []
     total_labor = 0.0
     total_parts = 0.0
+    total_internal_cost = 0.0
 
     for item in quote.itens:
         labor = _item_labor(item)
         parts = _money(item.custo_peca)
         subtotal = _money(labor + parts)
+        internal_cost = _money(item.custo_interno)
+        gross_margin = _money(labor - internal_cost)
 
         labor_values.append(labor)
         total_labor = _money(total_labor + labor)
         total_parts = _money(total_parts + parts)
+        total_internal_cost = _money(total_internal_cost + internal_cost)
         response_items.append(
             QuoteItemResponse(
                 **item.model_dump(),
                 subtotal=subtotal,
+                margem_bruta=gross_margin,
             ),
         )
 
@@ -150,6 +155,7 @@ def _calculate_quote(
         gross_subtotal,
         total,
         message,
+        total_internal_cost,
     )
 
 
@@ -163,6 +169,7 @@ def _quote_payload(
     message: str,
     status: str,
     created_at: datetime,
+    total_internal_cost: float,
     updated_at: datetime | None = None,
 ) -> dict:
     payload = {
@@ -171,6 +178,7 @@ def _quote_payload(
             {
                 **item.model_dump(mode="json"),
                 "subtotal": response_item.subtotal,
+                "margem_bruta": response_item.margem_bruta,
             }
             for item, response_item in zip(quote.itens, response_items)
         ],
@@ -180,6 +188,9 @@ def _quote_payload(
         "desconto": _money(quote.desconto),
         "taxa_deslocamento": _money(quote.taxa_deslocamento),
         "valor_total": total,
+        "custo_interno_total": _money(total_internal_cost),
+        "margem_bruta": _money(total_labor - total_internal_cost),
+        "margem_percentual": _money((total_labor - total_internal_cost) / total_labor * 100) if total_labor else 0.0,
         "status": status,
         "criado_em": created_at,
         "observacoes": quote.observacoes,
@@ -197,6 +208,12 @@ def _quote_from_snapshot(snapshot) -> QuoteResponse:
     data.setdefault("criado_em", getattr(snapshot, "create_time", _utc_now()))
     data.setdefault("observacoes", None)
     data.setdefault("mensagem_whatsapp", "")
+    data.setdefault("custo_interno_total", 0.0)
+    data.setdefault("margem_bruta", _money(data.get("total_mao_de_obra", 0) - data.get("custo_interno_total", 0)))
+    data.setdefault("margem_percentual", _money(data["margem_bruta"] / data["total_mao_de_obra"] * 100) if data.get("total_mao_de_obra", 0) else 0.0)
+    for item in data.get("itens", []):
+        item.setdefault("custo_interno", 0.0)
+        item.setdefault("margem_bruta", _money(item.get("subtotal", 0) - item.get("custo_peca", 0) - item.get("custo_interno", 0)))
     return QuoteResponse.model_validate(data)
 
 
@@ -221,6 +238,7 @@ def create_quote(quote: QuoteCreate) -> QuoteResponse:
         gross_subtotal,
         total,
         message,
+        total_internal_cost,
     ) = _calculate_quote(quote)
     created_at = _utc_now()
     document = database.collection(COLLECTION_NAME).document()
@@ -235,6 +253,7 @@ def create_quote(quote: QuoteCreate) -> QuoteResponse:
         message,
         QuoteStatus.RASCUNHO.value,
         created_at,
+        total_internal_cost,
     )
 
     try:
@@ -302,6 +321,7 @@ def update_quote(quote_id: str, quote: QuoteCreate) -> QuoteResponse:
             gross_subtotal,
             total,
             message,
+            total_internal_cost,
         ) = _calculate_quote(quote)
         created_at = current_data.get(
             "criado_em",
@@ -318,6 +338,7 @@ def update_quote(quote_id: str, quote: QuoteCreate) -> QuoteResponse:
             message,
             current_data.get("status", QuoteStatus.RASCUNHO.value),
             created_at,
+            total_internal_cost,
             updated_at,
         )
         document.set(payload)
@@ -372,6 +393,12 @@ def update_quote_status(
         data["status"] = status_update.status.value
         data.setdefault("criado_em", getattr(snapshot, "create_time", _utc_now()))
         data.setdefault("mensagem_whatsapp", "")
+        data.setdefault("custo_interno_total", 0.0)
+        data.setdefault("margem_bruta", _money(data.get("total_mao_de_obra", 0) - data.get("custo_interno_total", 0)))
+        data.setdefault("margem_percentual", _money(data["margem_bruta"] / data["total_mao_de_obra"] * 100) if data.get("total_mao_de_obra", 0) else 0.0)
+        for item in data.get("itens", []):
+            item.setdefault("custo_interno", 0.0)
+            item.setdefault("margem_bruta", _money(item.get("subtotal", 0) - item.get("custo_peca", 0) - item.get("custo_interno", 0)))
         return QuoteResponse.model_validate(data)
     except HTTPException:
         raise

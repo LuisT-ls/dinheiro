@@ -9,12 +9,14 @@
   const navigation = [
     { href: '/', label: 'Novo orçamento', shortLabel: 'Novo' },
     { href: '/historico', label: 'Histórico', shortLabel: 'Histórico' },
+    { href: '/dashboard', label: 'Painel', shortLabel: 'Painel' },
     { href: '/servicos', label: 'Catálogo', shortLabel: 'Catálogo' },
   ];
 
   let accessReady = false;
   let accessConfigured = false;
   let theme: 'light' | 'dark' = 'light';
+  let isOnline = true;
 
   function applyTheme(nextTheme: 'light' | 'dark') {
     theme = nextTheme;
@@ -35,7 +37,8 @@
     if (!browser) return;
     accessConfigured = isAccessPinConfigured();
     const isLoginPage = $page.url.pathname === '/login';
-    if (accessConfigured && !hasAccess() && !isLoginPage) {
+    const isPublicSharePage = $page.url.pathname.startsWith('/compartilhar/');
+    if (accessConfigured && !hasAccess() && !isLoginPage && !isPublicSharePage) {
       accessReady = false;
       goto('/login');
       return;
@@ -51,7 +54,16 @@
   if (browser) afterNavigate(enforceAccess);
   onMount(() => {
     initializeTheme();
+    isOnline = navigator.onLine;
+    const handleOnline = () => (isOnline = true);
+    const handleOffline = () => (isOnline = false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     enforceAccess();
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   });
 
   function logout() {
@@ -66,7 +78,7 @@
 
 {#if accessReady}
   <div class="min-h-screen text-slate-900">
-    {#if $page.url.pathname !== '/login'}
+    {#if $page.url.pathname !== '/login' && !$page.url.pathname.startsWith('/compartilhar/')}
       <header class="border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-7xl items-center justify-between gap-6 px-4 py-4 sm:px-6 lg:px-8">
           <a href="/" class="flex items-center gap-3" aria-label="Dinheiro início">
@@ -82,6 +94,7 @@
                 </a>
               {/each}
             </nav>
+            <a href="/configuracoes" class="settings-link" class:nav-active={$page.url.pathname === '/configuracoes'} aria-label="Configurações" title="Configurações">⚙</a>
             <button type="button" class="theme-toggle" on:click={toggleTheme} aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><span class="hidden sm:inline">{theme === 'dark' ? 'Claro' : 'Escuro'}</span></button>
             {#if accessConfigured}<button type="button" class="rounded-lg px-2.5 py-2 text-xs font-bold text-slate-400 transition hover:bg-rose-50 hover:text-rose-600" on:click={logout} title="Sair">Sair</button>{/if}
           </div>
@@ -89,9 +102,15 @@
       </header>
     {/if}
 
+    {#if !isOnline && !$page.url.pathname.startsWith('/compartilhar/')}
+      <div class="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-xs font-semibold text-amber-800">
+        Você está offline. Rascunhos e templates continuam disponíveis neste dispositivo; sincronização com o Firestore volta quando a conexão retornar.
+      </div>
+    {/if}
+
     <main class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10"><slot /></main>
 
-    {#if $page.url.pathname !== '/login'}
+    {#if $page.url.pathname !== '/login' && !$page.url.pathname.startsWith('/compartilhar/')}
       <footer class="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 pb-8 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"><span>Dinheiro · orçamentos técnicos</span><span>FastAPI · SvelteKit · Firestore</span></footer>
     {/if}
   </div>
@@ -108,5 +127,9 @@
 
   .theme-toggle {
     @apply inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+  }
+
+  .settings-link {
+    @apply grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
   }
 </style>

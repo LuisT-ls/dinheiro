@@ -129,7 +129,9 @@ html.dark .filter-active .filter-count {
 
 html.dark .card-action,
 html.dark .action-button,
-html.dark .theme-toggle {
+html.dark .theme-toggle,
+html.dark .settings-link,
+html.dark .pipeline-stage {
   border-color: #334155 !important;
   background: #172236 !important;
   color: #cbd5e1 !important;
@@ -137,7 +139,9 @@ html.dark .theme-toggle {
 
 html.dark .card-action:hover,
 html.dark .action-button:hover,
-html.dark .theme-toggle:hover {
+html.dark .theme-toggle:hover,
+html.dark .settings-link:hover,
+html.dark .pipeline-stage:hover {
   border-color: #6366f1 !important;
   background: #263449 !important;
   color: #e0e7ff !important;
@@ -318,6 +322,10 @@ html.dark [class~="text-amber-600"] {
   color: #fbbf24 !important;
 }
 
+html.dark [class~="text-amber-700"] {
+  color: #fcd34d !important;
+}
+
 html.dark [class~="text-emerald-600"],
 html.dark [class~="text-emerald-700"] {
   color: #6ee7b7 !important;
@@ -338,6 +346,10 @@ html.dark [class~="ring-sky-200"] {
 
 html.dark [class~="ring-emerald-200"] {
   --tw-ring-color: #047857 !important;
+}
+
+html.dark [class~="ring-amber-200"] {
+  --tw-ring-color: #92400e !important;
 }
 
 html.dark [class~="ring-rose-200"] {

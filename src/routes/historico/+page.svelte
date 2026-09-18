@@ -8,6 +8,7 @@
   const statuses: { value: QuoteStatus; label: string }[] = [
     { value: 'rascunho', label: 'Rascunho' },
     { value: 'enviado', label: 'Enviado' },
+    { value: 'negociacao', label: 'Negociação' },
     { value: 'aprovado', label: 'Aprovado' },
     { value: 'recusado', label: 'Recusado' },
     { value: 'concluido', label: 'Concluído' },
@@ -44,10 +45,16 @@
   $: approvedValue = quotes
     .filter((quote) => quote.status === 'aprovado' || quote.status === 'concluido')
     .reduce((sum, quote) => sum + quote.valor_total, 0);
-  $: attentionCount = quotes.filter((quote) => quote.status === 'rascunho' || quote.status === 'enviado').length;
+  $: attentionCount = quotes.filter((quote) => quote.status === 'rascunho' || quote.status === 'enviado' || quote.status === 'negociacao').length;
   $: hasFilters = Boolean(normalizedQuery) || filterStatus !== 'todos';
 
-  onMount(loadQuotes);
+  onMount(() => {
+    const requestedStatus = new URLSearchParams(window.location.search).get('status') as QuoteStatus | null;
+    if (requestedStatus && statuses.some((status) => status.value === requestedStatus)) {
+      filterStatus = requestedStatus;
+    }
+    loadQuotes();
+  });
 
   async function loadQuotes() {
     loading = true;
@@ -84,6 +91,7 @@
     return {
       rascunho: 'bg-slate-100 text-slate-600 ring-slate-200',
       enviado: 'bg-sky-50 text-sky-700 ring-sky-200',
+      negociacao: 'bg-amber-50 text-amber-700 ring-amber-200',
       aprovado: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
       recusado: 'bg-rose-50 text-rose-700 ring-rose-200',
       concluido: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
@@ -94,6 +102,7 @@
     return {
       rascunho: 'bg-slate-400',
       enviado: 'bg-sky-500',
+      negociacao: 'bg-amber-500',
       aprovado: 'bg-emerald-500',
       recusado: 'bg-rose-500',
       concluido: 'bg-indigo-500',
@@ -162,6 +171,17 @@
       window.open(whatsappUrl(quote), '_blank', 'noopener,noreferrer');
     }
   }
+
+  async function copyShareLink(quote: QuoteResponse) {
+    const link = `${window.location.origin}/compartilhar/${encodeURIComponent(quote.id)}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast = 'Link público copiado.';
+    } catch {
+      toast = 'Não foi possível copiar o link automaticamente.';
+    }
+    window.setTimeout(() => (toast = ''), 3000);
+  }
 </script>
 
 <svelte:head>
@@ -195,12 +215,28 @@
       <span class="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-lg text-sky-600">↗</span>
     </div>
     <div class="surface flex items-start justify-between p-4 sm:p-5">
-      <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Aguardando ação</p><p class="mt-2 text-2xl font-black tracking-tight text-slate-950">{attentionCount}</p><p class="mt-1 text-xs text-slate-500">rascunhos ou enviados</p></div>
+      <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Aguardando ação</p><p class="mt-2 text-2xl font-black tracking-tight text-slate-950">{attentionCount}</p><p class="mt-1 text-xs text-slate-500">em aberto ou negociação</p></div>
       <span class="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-lg text-amber-600">◷</span>
     </div>
     <div class="surface flex items-start justify-between p-4 sm:p-5">
       <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Aprovado / concluído</p><p class="mt-2 text-xl font-black tracking-tight text-slate-950">{money(approvedValue)}</p><p class="mt-1 text-xs text-slate-500">valor convertido</p></div>
       <span class="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-lg text-emerald-600">✓</span>
+    </div>
+  </section>
+
+  <section class="surface p-4 sm:p-5">
+    <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+      <div><p class="eyebrow">Pipeline comercial</p><h2 class="mt-1 text-base font-bold text-slate-900">Veja onde cada proposta está</h2></div>
+      <span class="text-xs font-semibold text-slate-400">{attentionCount} em andamento</span>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {#each statuses.filter((status) => status.value !== 'recusado') as status}
+        <button type="button" class:filter-active={filterStatus === status.value} class="pipeline-stage" on:click={() => (filterStatus = status.value)} aria-pressed={filterStatus === status.value}>
+          <span class={`h-2 w-2 rounded-full ${statusDotClass(status.value)}`}></span>
+          <span class="min-w-0 flex-1 truncate text-left">{status.label}</span>
+          <strong>{countFor(status.value)}</strong>
+        </button>
+      {/each}
     </div>
   </section>
 
@@ -256,6 +292,7 @@
                     <span class="rounded-md bg-slate-100 px-2 py-1 text-slate-500">{quote.itens.length} serviço{quote.itens.length === 1 ? '' : 's'}</span>
                     {#if quote.cliente.telefone}<span>{quote.cliente.telefone}</span>{:else}<span>Sem telefone</span>{/if}
                     {#if quote.observacoes}<span class="max-w-xs truncate text-indigo-500" title={quote.observacoes}>Com observações</span>{/if}
+                    {#if quote.margem_percentual != null}<span class="text-emerald-600">Margem {quote.margem_percentual.toFixed(0)}%</span>{/if}
                   </div>
                 </div>
               </div>
@@ -272,6 +309,7 @@
                 <a href={`/?edit=${encodeURIComponent(quote.id)}`} class="action-button action-primary" title="Editar orçamento">✎ <span>Editar</span></a>
                 <a href={`/?clone=${encodeURIComponent(quote.id)}`} class="action-button" title="Duplicar orçamento">⧉ <span>Duplicar</span></a>
                 <button type="button" class="action-button action-pdf" on:click={() => gerarOrcamentoPDF(quote)} title="Baixar PDF">↓ <span>PDF</span></button>
+                <button type="button" class="action-button" on:click={() => copyShareLink(quote)} title="Copiar link público">⌁ <span>Link</span></button>
                 <button type="button" class="action-button action-whatsapp disabled:cursor-not-allowed disabled:opacity-40" on:click={() => resendWhatsApp(quote)} disabled={!quote.cliente.telefone} title={quote.cliente.telefone ? 'Reenviar pelo WhatsApp' : 'Telefone não informado'}>↗ <span>WhatsApp</span></button>
                 <button type="button" class="action-button action-delete disabled:cursor-not-allowed disabled:opacity-50" on:click={() => removeQuote(quote)} disabled={deletingId === quote.id} title="Excluir orçamento">⌫ <span>{deletingId === quote.id ? 'Excluindo...' : 'Excluir'}</span></button>
               </div>
@@ -318,5 +356,21 @@
 
   .action-delete {
     @apply border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100;
+  }
+
+  .pipeline-stage {
+    @apply inline-flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+  }
+
+  .pipeline-stage strong {
+    @apply ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500;
+  }
+
+  .pipeline-stage.filter-active {
+    @apply border-slate-900 bg-slate-900 text-white hover:bg-slate-900;
+  }
+
+  .pipeline-stage.filter-active strong {
+    @apply bg-white/15 text-white;
   }
 </style>

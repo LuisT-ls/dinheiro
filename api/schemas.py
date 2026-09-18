@@ -33,6 +33,7 @@ class PricingType(str, Enum):
 class QuoteStatus(str, Enum):
     RASCUNHO = "rascunho"
     ENVIADO = "enviado"
+    NEGOCIACAO = "negociacao"
     APROVADO = "aprovado"
     RECUSADO = "recusado"
     CONCLUIDO = "concluido"
@@ -43,6 +44,7 @@ class ServiceBase(StrictModel):
     categoria: ServiceCategory
     tipo_cobranca: PricingType
     valor_base: float = Field(..., ge=0)
+    custo_base: float = Field(default=0.0, ge=0)
     permite_peca: bool = False
     descricao_padrao: str | None = Field(default=None, max_length=1000)
 
@@ -83,6 +85,7 @@ class QuoteItemInput(StrictModel):
     nome: str = Field(..., min_length=1, max_length=200)
     categoria: ServiceCategory | None = None
     mao_de_obra: float = Field(..., ge=0)
+    custo_interno: float = Field(default=0.0, ge=0)
     custo_peca: float = Field(default=0.0, ge=0)
     horas_estimadas: float | None = Field(default=None, ge=0)
     taxa_hora: float | None = Field(default=None, ge=0)
@@ -92,6 +95,7 @@ class QuoteItemInput(StrictModel):
 
 class QuoteItemResponse(QuoteItemInput):
     subtotal: float = Field(..., ge=0)
+    margem_bruta: float = 0.0
 
 
 class QuoteCreate(StrictModel):
@@ -116,6 +120,9 @@ class QuoteResponse(StrictModel):
     desconto: float = Field(..., ge=0)
     taxa_deslocamento: float = Field(..., ge=0)
     valor_total: float
+    custo_interno_total: float = 0.0
+    margem_bruta: float = 0.0
+    margem_percentual: float = 0.0
     status: QuoteStatus
     criado_em: datetime
     atualizado_em: datetime | None = None

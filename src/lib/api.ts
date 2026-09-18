@@ -1,6 +1,6 @@
 export type ServiceCategory = 'dev' | 'hardware' | 'infra' | 'outros';
 export type PricingType = 'fixo' | 'hora' | 'misto';
-export type QuoteStatus = 'rascunho' | 'enviado' | 'aprovado' | 'recusado' | 'concluido';
+export type QuoteStatus = 'rascunho' | 'enviado' | 'negociacao' | 'aprovado' | 'recusado' | 'concluido';
 
 export interface Service {
   id: string;
@@ -8,6 +8,7 @@ export interface Service {
   categoria: ServiceCategory;
   tipo_cobranca: PricingType;
   valor_base: number;
+  custo_base: number;
   permite_peca: boolean;
   descricao_padrao: string | null;
   criado_em: string;
@@ -24,6 +25,7 @@ export interface QuoteItemInput {
   nome: string;
   categoria?: ServiceCategory | null;
   mao_de_obra: number;
+  custo_interno?: number;
   custo_peca?: number;
   horas_estimadas?: number | null;
   taxa_hora?: number | null;
@@ -41,6 +43,7 @@ export interface QuoteCreate {
 
 export interface QuoteItemResponse extends QuoteItemInput {
   subtotal: number;
+  margem_bruta?: number;
 }
 
 export interface QuoteResponse {
@@ -53,6 +56,9 @@ export interface QuoteResponse {
   desconto: number;
   taxa_deslocamento: number;
   valor_total: number;
+  custo_interno_total?: number;
+  margem_bruta?: number;
+  margem_percentual?: number;
   status: QuoteStatus;
   criado_em: string;
   atualizado_em?: string | null;
@@ -77,6 +83,7 @@ export interface ServiceCreate {
   categoria: ServiceCategory;
   tipo_cobranca: PricingType;
   valor_base: number;
+  custo_base?: number;
   permite_peca: boolean;
   descricao_padrao?: string | null;
 }

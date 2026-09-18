@@ -19,6 +19,7 @@
     categoria: ServiceCategory;
     tipo_cobranca: PricingType;
     valor_base: number;
+    custo_base: number;
     permite_peca: boolean;
     descricao_padrao: string;
   };
@@ -36,6 +37,7 @@
     categoria: 'hardware',
     tipo_cobranca: 'fixo',
     valor_base: 0,
+    custo_base: 0,
     permite_peca: false,
     descricao_padrao: '',
   });
@@ -151,6 +153,7 @@
       categoria: service.categoria,
       tipo_cobranca: service.tipo_cobranca,
       valor_base: service.valor_base,
+      custo_base: service.custo_base ?? 0,
       permite_peca: service.permite_peca,
       descricao_padrao: service.descricao_padrao ?? '',
     };
@@ -182,6 +185,7 @@
       categoria: form.categoria,
       tipo_cobranca: form.tipo_cobranca,
       valor_base: valorBase,
+      custo_base: Math.max(0, Number(form.custo_base) || 0),
       permite_peca: form.permite_peca,
       descricao_padrao: form.descricao_padrao.trim() || null,
     };
@@ -326,7 +330,7 @@
       <form class="mt-5 space-y-4" on:submit|preventDefault={saveService}>
         <label><span class="field-label">Nome do serviço</span><input class="field" bind:value={form.nome} maxlength="90" placeholder="Ex.: Diagnóstico avançado" autocomplete="off" /></label>
         <div class="grid grid-cols-2 gap-3"><label><span class="field-label">Categoria</span><select class="field" bind:value={form.categoria}><option value="hardware">Hardware</option><option value="dev">Dev</option><option value="infra">Infra</option><option value="outros">Outros</option></select></label><label><span class="field-label">Cobrança</span><select class="field" bind:value={form.tipo_cobranca}><option value="fixo">Fixo</option><option value="hora">Por hora</option><option value="misto">Peça + MO</option></select></label></div>
-        <label><span class="field-label">Valor base (R$){form.tipo_cobranca === 'hora' ? ' por hora' : ''}</span><div class="relative"><input class="field pr-12" type="number" min="0" step="0.01" bind:value={form.valor_base} /><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">BRL</span></div><span class="mt-1 block text-[11px] text-slate-400">{form.tipo_cobranca === 'hora' ? 'Usado como taxa/hora no orçamento.' : 'Você poderá ajustar este valor ao criar uma proposta.'}</span></label>
+        <div class="grid grid-cols-2 gap-3"><label><span class="field-label">Valor de venda (R$){form.tipo_cobranca === 'hora' ? ' / hora' : ''}</span><input class="field" type="number" min="0" step="0.01" bind:value={form.valor_base} /></label><label><span class="field-label">Custo interno (R$)</span><input class="field" type="number" min="0" step="0.01" bind:value={form.custo_base} /><span class="mt-1 block text-[11px] text-slate-400">Não aparece para o cliente.</span></label></div>
         <label><span class="field-label">Descrição curta <span class="font-normal normal-case tracking-normal text-slate-400">(opcional)</span></span><textarea class="field min-h-24 resize-y" maxlength="180" bind:value={form.descricao_padrao} placeholder="O que está incluído neste serviço?"></textarea><span class="mt-1 block text-right text-[11px] text-slate-400">{form.descricao_padrao.length}/180</span></label>
         <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 px-3.5 py-3.5 transition hover:border-indigo-200 hover:bg-indigo-50/30"><input class="mt-0.5 h-4 w-4 accent-indigo-600" type="checkbox" bind:checked={form.permite_peca} /><span><span class="block text-sm font-semibold text-slate-700">Permite incluir peça</span><span class="mt-0.5 block text-xs leading-5 text-slate-400">Exibe um campo para custo de peça no orçamento.</span></span></label>
 

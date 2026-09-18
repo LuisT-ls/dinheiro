@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
   import { onMount } from 'svelte';
   import {
     createQuote,
@@ -14,12 +15,15 @@
     type QuoteResponse,
     type Service,
   } from '$lib/api';
+  import { clearSavedQuoteDraft, loadSavedQuoteDraft, saveQuoteDraft, type SavedQuoteDraft } from '$lib/drafts';
+  import { listQuoteTemplates, removeQuoteTemplate, saveQuoteTemplate, type QuoteTemplate } from '$lib/templates';
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
 
   type CategoryFilter = 'todos' | 'hardware' | 'dev' | 'infra' | 'outros';
   type QuoteDraft = {
     service: Service;
     mao_de_obra: number;
+    custo_interno: number;
     custo_peca: number;
     horas_estimadas: number | null;
     taxa_hora: number | null;
@@ -45,6 +49,8 @@
   let discount = 0;
   let travelFee = 0;
   let showAiPanel = true;
+  let showTemplates = false;
+  let templates: QuoteTemplate[] = [];
   let loadingServices = true;
   let analyzing = false;
   let saving = false;
@@ -57,6 +63,10 @@
   let draftMode: 'new' | 'edit' | 'clone' = 'new';
   let draftSourceId = '';
   let loadingDraft = false;
+  let draftReady = false;
+  let draftSnapshot: SavedQuoteDraft | null = null;
+  let draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastDraftSaved = '';
 
   $: normalizedServiceSearch = serviceSearch.trim().toLocaleLowerCase('pt-BR');
   $: filteredServices = services.filter((service) => {
@@ -69,6 +79,9 @@
   $: selectedCount = selectedItems.length;
   $: laborSubtotal = selectedItems.reduce((sum, item) => sum + calculateLabor(item), 0);
   $: partsSubtotal = selectedItems.reduce((sum, item) => sum + (Number(item.custo_peca) || 0), 0);
+  $: internalCostSubtotal = selectedItems.reduce((sum, item) => sum + (Number(item.custo_interno) || 0), 0);
+  $: grossMargin = roundMoney(laborSubtotal - internalCostSubtotal);
+  $: marginPercentage = laborSubtotal > 0 ? roundMoney((grossMargin / laborSubtotal) * 100) : 0;
   $: grossSubtotal = roundMoney(laborSubtotal + partsSubtotal);
   $: finalTotal = roundMoney(grossSubtotal + (Number(travelFee) || 0) - (Number(discount) || 0));
   $: hasServiceFilters = Boolean(normalizedServiceSearch) || activeCategory !== 'todos';
@@ -76,8 +89,34 @@
 
   onMount(async () => {
     await loadCatalog();
-    await loadDraftFromQuery();
+    templates = listQuoteTemplates();
+    const loadedFromQuery = await loadDraftFromQuery();
+    if (!loadedFromQuery) restoreSavedDraft();
+    draftReady = true;
   });
+
+  $: draftSnapshot = draftReady && draftMode === 'new'
+    ? {
+        cliente: { ...customer },
+        observacoes,
+        clientMessage,
+        desconto: Number(discount) || 0,
+        taxa_deslocamento: Number(travelFee) || 0,
+        itens: selectedItems.map((item) => ({
+          service_id: item.service.id,
+          mao_de_obra: Number(item.mao_de_obra) || 0,
+          custo_interno: Number(item.custo_interno) || 0,
+          custo_peca: Number(item.custo_peca) || 0,
+          horas_estimadas: item.horas_estimadas,
+          taxa_hora: item.taxa_hora,
+          margem_seguranca: item.margem_seguranca,
+          descricao_customizada: item.descricao_customizada,
+        })),
+        atualizado_em: new Date().toISOString(),
+      }
+    : null;
+
+  $: if (draftSnapshot) queueDraftSave(draftSnapshot);
 
   async function loadCatalog() {
     loadingServices = true;
@@ -140,6 +179,7 @@
     return {
       service,
       mao_de_obra: service.tipo_cobranca === 'hora' ? 0 : service.valor_base,
+      custo_interno: service.custo_base ?? 0,
       custo_peca: 0,
       horas_estimadas: service.tipo_cobranca === 'hora' ? 1 : null,
       taxa_hora: service.tipo_cobranca === 'hora' ? service.valor_base : null,
@@ -156,6 +196,7 @@
       categoria: item.categoria ?? 'outros',
       tipo_cobranca: item.horas_estimadas != null && item.taxa_hora != null ? 'hora' : 'fixo',
       valor_base: item.mao_de_obra,
+      custo_base: item.custo_interno ?? 0,
       permite_peca: Number(item.custo_peca) > 0,
       descricao_padrao: item.descricao_customizada ?? null,
       criado_em: quote.criado_em,
@@ -164,6 +205,7 @@
     return {
       service,
       mao_de_obra: service.tipo_cobranca === 'hora' ? 0 : item.mao_de_obra,
+      custo_interno: item.custo_interno ?? service.custo_base ?? 0,
       custo_peca: Number(item.custo_peca) || 0,
       horas_estimadas: item.horas_estimadas,
       taxa_hora: item.taxa_hora,
@@ -172,15 +214,16 @@
     };
   }
 
-  async function loadDraftFromQuery() {
+  async function loadDraftFromQuery(): Promise<boolean> {
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('edit');
     const cloneId = params.get('clone');
     const sourceId = editId || cloneId;
-    if (!sourceId) return;
+    if (!sourceId) return false;
 
     loadingDraft = true;
     pageError = '';
+    let loaded = false;
     try {
       const quote = await getQuote(sourceId);
       customer = { ...quote.cliente };
@@ -191,6 +234,7 @@
       draftMode = editId ? 'edit' : 'clone';
       draftSourceId = sourceId;
       savedQuote = editId ? quote : null;
+      loaded = true;
       toast = editId ? `Orçamento #${sourceId} carregado para edição.` : `Orçamento #${sourceId} duplicado.`;
       window.setTimeout(() => (toast = ''), 3500);
     } catch (error) {
@@ -198,6 +242,115 @@
     } finally {
       loadingDraft = false;
     }
+    return loaded;
+  }
+
+  function restoreSavedDraft() {
+    const saved = loadSavedQuoteDraft();
+    if (!saved || (saved.itens.length === 0 && !saved.cliente.nome && !saved.observacoes)) return;
+
+    customer = { ...saved.cliente };
+    observations = saved.observacoes ?? '';
+    clientMessage = saved.clientMessage ?? '';
+    discount = saved.desconto ?? 0;
+    travelFee = saved.taxa_deslocamento ?? 0;
+    selectedItems = saved.itens
+      .map((item) => {
+        const service = services.find((candidate) => candidate.id === item.service_id);
+        if (!service) return null;
+        return {
+          service,
+          mao_de_obra: item.mao_de_obra,
+          custo_interno: item.custo_interno ?? service.custo_base ?? 0,
+          custo_peca: item.custo_peca,
+          horas_estimadas: item.horas_estimadas,
+          taxa_hora: item.taxa_hora,
+          margem_seguranca: item.margem_seguranca ?? 1.25,
+          descricao_customizada: item.descricao_customizada ?? service.descricao_padrao,
+        } as QuoteDraft;
+      })
+      .filter((item): item is QuoteDraft => Boolean(item));
+    toast = 'Rascunho recuperado automaticamente.';
+    window.setTimeout(() => (toast = ''), 3500);
+  }
+
+  function queueDraftSave(snapshot: SavedQuoteDraft) {
+    if (!browser) return;
+    if (draftSaveTimer) window.clearTimeout(draftSaveTimer);
+    draftSaveTimer = window.setTimeout(() => {
+      saveQuoteDraft(snapshot);
+      lastDraftSaved = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
+      draftSaveTimer = null;
+    }, 500);
+  }
+
+  function clearDraft() {
+    clearSavedQuoteDraft();
+    lastDraftSaved = '';
+    toast = 'Rascunho local removido.';
+    window.setTimeout(() => (toast = ''), 2500);
+  }
+
+  function saveCurrentAsTemplate() {
+    if (selectedItems.length === 0) {
+      toast = 'Selecione ao menos um serviço para criar um template.';
+      window.setTimeout(() => (toast = ''), 3000);
+      return;
+    }
+    const name = window.prompt('Nome do template', 'Novo template');
+    if (!name?.trim()) return;
+    saveQuoteTemplate({
+      nome: name.trim(),
+      itens: selectedItems.map((item) => ({
+        service_id: item.service.id,
+        mao_de_obra: item.mao_de_obra,
+        custo_interno: item.custo_interno,
+        custo_peca: item.custo_peca,
+        horas_estimadas: item.horas_estimadas,
+        taxa_hora: item.taxa_hora,
+        margem_seguranca: item.margem_seguranca,
+        descricao_customizada: item.descricao_customizada,
+      })),
+      desconto: Number(discount) || 0,
+      taxa_deslocamento: Number(travelFee) || 0,
+      observacoes,
+    });
+    templates = listQuoteTemplates();
+    toast = 'Template salvo para os próximos orçamentos.';
+    window.setTimeout(() => (toast = ''), 3000);
+  }
+
+  function applyTemplate(template: QuoteTemplate) {
+    const nextItems = template.itens
+      .map((item) => {
+        const service = services.find((candidate) => candidate.id === item.service_id);
+        if (!service) return null;
+        return {
+          service,
+          mao_de_obra: item.mao_de_obra,
+          custo_interno: item.custo_interno ?? service.custo_base ?? 0,
+          custo_peca: item.custo_peca,
+          horas_estimadas: item.horas_estimadas,
+          taxa_hora: item.taxa_hora,
+          margem_seguranca: item.margem_seguranca,
+          descricao_customizada: item.descricao_customizada ?? service.descricao_padrao,
+        } as QuoteDraft;
+      })
+      .filter((item): item is QuoteDraft => Boolean(item));
+    selectedItems = nextItems;
+    discount = template.desconto;
+    travelFee = template.taxa_deslocamento;
+    observations = template.observacoes;
+    savedQuote = null;
+    showTemplates = false;
+    toast = `${template.nome} aplicado ao orçamento.`;
+    window.setTimeout(() => (toast = ''), 3000);
+  }
+
+  function deleteTemplate(template: QuoteTemplate) {
+    if (!window.confirm(`Excluir o template “${template.nome}”?`)) return;
+    removeQuoteTemplate(template.id);
+    templates = listQuoteTemplates();
   }
 
   function cancelDraft() {
@@ -268,6 +421,7 @@
         nome: item.service.nome,
         categoria: item.service.categoria,
         mao_de_obra: item.service.tipo_cobranca === 'hora' ? 0 : item.mao_de_obra,
+        custo_interno: roundMoney(Number(item.custo_interno) || 0),
         custo_peca: roundMoney(Number(item.custo_peca) || 0),
         horas_estimadas: item.horas_estimadas,
         taxa_hora: item.taxa_hora,
@@ -295,11 +449,14 @@
     try {
       if (draftMode === 'edit' && draftSourceId) {
         savedQuote = await updateQuote(draftSourceId, buildQuote());
+        clearSavedQuoteDraft();
         await goto('/historico');
         return;
       }
 
       savedQuote = await createQuote(buildQuote());
+      clearSavedQuoteDraft();
+      lastDraftSaved = '';
       draftMode = 'new';
       draftSourceId = '';
       toast = 'Orçamento salvo com sucesso.';
@@ -331,6 +488,18 @@
     } catch {
       toast = 'Não foi possível copiar automaticamente.';
     }
+  }
+
+  async function copyShareLink() {
+    if (!savedQuote) return;
+    const link = `${window.location.origin}/compartilhar/${encodeURIComponent(savedQuote.id)}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast = 'Link público copiado para compartilhar com o cliente.';
+    } catch {
+      toast = 'Não foi possível copiar o link automaticamente.';
+    }
+    window.setTimeout(() => (toast = ''), 3500);
   }
 </script>
 
@@ -366,6 +535,26 @@
     <div class="metric-card metric-card-highlight"><span class="metric-icon bg-indigo-600 text-white">R$</span><div><p class="metric-label text-indigo-700">Total estimado</p><p class="metric-value text-lg text-indigo-950">{money(finalTotal)}</p><p class="metric-caption text-indigo-600">atualizado em tempo real</p></div></div>
   </section>
 
+  <section class="surface overflow-hidden">
+    <div class="flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+      <div><p class="eyebrow">Atalhos de produção</p><h2 class="mt-1 text-base font-bold text-slate-900">Templates rápidos</h2><p class="mt-1 text-xs text-slate-500">Salve combinações recorrentes e reaproveite-as em um clique.</p></div>
+      <div class="flex flex-wrap gap-2"><button type="button" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700" on:click={() => (showTemplates = !showTemplates)}>{showTemplates ? 'Fechar templates' : `Ver templates (${templates.length})`}</button><button type="button" class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-700" on:click={saveCurrentAsTemplate} disabled={selectedCount === 0}>Salvar seleção</button></div>
+    </div>
+    {#if showTemplates}
+      <div class="border-t border-slate-100 px-5 py-4 sm:px-6">
+        {#if templates.length === 0}
+          <p class="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-center text-xs text-slate-500">Nenhum template salvo ainda. Monte um orçamento e clique em “Salvar seleção”.</p>
+        {:else}
+          <div class="grid gap-2 md:grid-cols-2">
+            {#each templates as template (template.id)}
+              <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3"><div class="min-w-0"><p class="truncate text-sm font-bold text-slate-800">{template.nome}</p><p class="mt-0.5 text-xs text-slate-500">{template.itens.length} serviço{template.itens.length === 1 ? '' : 's'} · {money(template.itens.reduce((sum, item) => sum + item.mao_de_obra, 0))}</p></div><div class="flex shrink-0 gap-1.5"><button type="button" class="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-[11px] font-bold text-indigo-700 transition hover:bg-indigo-50" on:click={() => applyTemplate(template)}>Usar</button><button type="button" class="rounded-lg px-2 py-1.5 text-[11px] font-bold text-rose-500 transition hover:bg-rose-50" on:click={() => deleteTemplate(template)} aria-label={`Excluir template ${template.nome}`}>Excluir</button></div></div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </section>
+
   {#if toast}
     <div class="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-xl">{toast}</div>
   {/if}
@@ -376,7 +565,7 @@
         <p class="eyebrow">01 · Contexto</p>
         <h2 class="mt-1 text-lg font-bold tracking-tight text-slate-900">Para quem é este orçamento?</h2>
       </div>
-      <span class:status-ready={customerReady} class="hidden rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500 sm:inline-flex">{customerReady ? 'Cliente identificado' : 'Falta o nome'}</span>
+      <div class="flex items-center gap-2"><span class="hidden text-[11px] text-slate-400 sm:inline">{lastDraftSaved ? `Salvo às ${lastDraftSaved}` : 'Salvamento automático ativo'}</span><span class:status-ready={customerReady} class="hidden rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500 sm:inline-flex">{customerReady ? 'Cliente identificado' : 'Falta o nome'}</span></div>
     </div>
     <div class="grid gap-4 md:grid-cols-3">
       <label>
@@ -527,6 +716,8 @@
           <div class="space-y-2 text-sm">
             <div class="flex justify-between gap-4 text-slate-500"><span>Mão de obra</span><span class="font-semibold text-slate-700">{money(laborSubtotal)}</span></div>
             <div class="flex justify-between gap-4 text-slate-500"><span>Peças</span><span class="font-semibold text-slate-700">{money(partsSubtotal)}</span></div>
+            <div class="flex justify-between gap-4 text-slate-500"><span>Custo interno</span><span class="font-semibold text-slate-700">{money(internalCostSubtotal)}</span></div>
+            <div class="flex justify-between gap-4 text-emerald-600"><span>Margem estimada ({marginPercentage}%)</span><span class="font-semibold">{money(grossMargin)}</span></div>
             {#if discount > 0}<div class="flex justify-between gap-4 text-emerald-600"><span>Desconto</span><span class="font-semibold">− {money(discount)}</span></div>{/if}
             {#if travelFee > 0}<div class="flex justify-between gap-4 text-slate-500"><span>Deslocamento</span><span class="font-semibold text-slate-700">{money(travelFee)}</span></div>{/if}
           </div>
@@ -539,6 +730,7 @@
         <div class="grid grid-cols-2 gap-2">
           <button type="button" class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-40" on:click={() => savedQuote && gerarOrcamentoPDF(savedQuote)} disabled={!savedQuote}>Baixar PDF</button>
           <button type="button" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={copyWhatsApp} disabled={!savedQuote}>Copiar mensagem</button>
+          <button type="button" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={copyShareLink} disabled={!savedQuote}>Copiar link</button>
           <button type="button" class="col-span-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40" on:click={openWhatsApp} disabled={!savedQuote || !savedQuote.cliente.telefone}>Abrir WhatsApp</button>
         </div>
         {#if savedQuote && !savedQuote.cliente.telefone}<p class="text-center text-[11px] leading-4 text-amber-600">Adicione um telefone para abrir a conversa automaticamente.</p>{/if}

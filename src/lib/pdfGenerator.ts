@@ -1,9 +1,6 @@
 import type { QuoteResponse, ServiceCategory } from './api';
 import type { jsPDF as JsPDF } from 'jspdf';
-
-const PROVIDER_NAME = 'LUÍS TEIXEIRA';
-const PROVIDER_SUBTITLE = 'SOLUÇÕES DIGITAIS & SUPORTE TÉCNICO';
-const FOOTER_LABEL = 'Proposta Comercial & Orçamento Técnico • Documento gerado digitalmente';
+import { getBusinessSettings } from './settings';
 
 const COLORS = {
   navy: { red: 15, green: 23, blue: 42 },
@@ -37,9 +34,9 @@ function dateLabel(value: string | Date) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
 }
 
-function validityDateLabel(value: string) {
+function validityDateLabel(value: string, validityDays: number) {
   const date = safeDate(value);
-  date.setDate(date.getDate() + 15);
+  date.setDate(date.getDate() + validityDays);
   return dateLabel(date);
 }
 
@@ -74,7 +71,7 @@ function setFill(doc: JsPDF, color: keyof typeof COLORS) {
   doc.setFillColor(value.red, value.green, value.blue);
 }
 
-function addFooter(doc: JsPDF) {
+function addFooter(doc: JsPDF, footerLabel: string) {
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {
     doc.setPage(page);
@@ -84,7 +81,7 @@ function addFooter(doc: JsPDF) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.1);
     setText(doc, 'slate500');
-    doc.text(FOOTER_LABEL, 18, 288);
+    doc.text(footerLabel, 18, 288);
     doc.text(`Página ${page} de ${pages}`, 192, 288, { align: 'right' });
   }
 }
@@ -95,6 +92,7 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
     import('jspdf-autotable'),
   ]);
   const doc = new JsPDFConstructor({ unit: 'mm', format: 'a4' });
+  const business = getBusinessSettings();
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 18;
   const contentWidth = pageWidth - margin * 2;
@@ -103,7 +101,7 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
   doc.setProperties({
     title: `Orçamento ${quote.id}`,
     subject: 'Proposta comercial e orçamento técnico',
-    author: PROVIDER_NAME,
+    author: business.nome,
   });
 
   // Cabeçalho executivo compacto.
@@ -112,11 +110,11 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16.5);
   setText(doc, 'white');
-  doc.text(PROVIDER_NAME, margin, 15);
+  doc.text(business.nome, margin, 15);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.7);
   doc.setTextColor(203, 213, 225);
-  doc.text(PROVIDER_SUBTITLE, margin, 22);
+  doc.text(business.subtitulo, margin, 22);
   doc.setDrawColor(COLORS.indigo.red, COLORS.indigo.green, COLORS.indigo.blue);
   doc.setLineWidth(1.1);
   doc.line(margin, 27, margin + 34, 27);
@@ -129,7 +127,7 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
   doc.setFontSize(7.8);
   doc.setTextColor(203, 213, 225);
   doc.text(`EMISSÃO  ${dateLabel(quote.criado_em)}`, rightEdge, 22, { align: 'right' });
-  doc.text(`VALIDADE  ${validityDateLabel(quote.criado_em)}`, rightEdge, 29, { align: 'right' });
+  doc.text(`VALIDADE  ${validityDateLabel(quote.criado_em, business.validade_dias)}`, rightEdge, 29, { align: 'right' });
 
   let y = 53;
 
@@ -285,15 +283,15 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
       title: 'PRAZOS E PAGAMENTO',
       lines: [
         'Execução e entrega conforme escopo e agenda aprovados.',
-        'Pagamento padrão: 50% de entrada e 50% na aprovação final.',
+        `Pagamento: ${business.pagamento}`,
       ],
     },
     {
       x: margin + cardWidth + cardGap,
       title: 'GARANTIA TÉCNICA',
       lines: [
-        'Hardware: 90 dias sobre a mão de obra, conforme CDC.',
-        'Dev: 30 dias de suporte para ajustes pós-deploy dentro do escopo.',
+        `Hardware: ${business.garantia_hardware}`,
+        `Dev: ${business.garantia_dev}`,
       ],
     },
   ];
@@ -335,6 +333,6 @@ export async function gerarOrcamentoPDF(quote: QuoteResponse) {
   doc.text('Prestador de Serviços', margin, y + 4.5);
   doc.text('Aceite do Cliente (Nome e Assinatura)', margin + 97, y + 4.5);
 
-  addFooter(doc);
+  addFooter(doc, business.rodape);
   doc.save(`orcamento-${slug(quote.cliente.nome)}-${fileDate(quote.criado_em)}.pdf`);
 }
