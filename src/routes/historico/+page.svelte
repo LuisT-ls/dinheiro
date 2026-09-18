@@ -174,7 +174,12 @@
   }
 
   async function copyShareLink(quote: QuoteResponse) {
-    const link = `${window.location.origin}/compartilhar/${encodeURIComponent(quote.id)}`;
+    if (!quote.share_token) {
+      toast = 'Não foi possível gerar um link seguro para este orçamento.';
+      window.setTimeout(() => (toast = ''), 3000);
+      return;
+    }
+    const link = `${window.location.origin}/compartilhar/${encodeURIComponent(quote.id)}?token=${encodeURIComponent(quote.share_token)}`;
     try {
       await navigator.clipboard.writeText(link);
       toast = 'Link público copiado.';

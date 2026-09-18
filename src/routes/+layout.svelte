@@ -3,7 +3,7 @@
   import { browser } from '$app/environment';
   import { afterNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { hasAccess, isAccessPinConfigured, revokeAccess } from '$lib/auth';
+  import { getSessionStatus, revokeAccess } from '$lib/auth';
   import '../app.css';
 
   const navigation = [
@@ -17,6 +17,7 @@
   let accessConfigured = false;
   let theme: 'light' | 'dark' = 'light';
   let isOnline = true;
+  let authCheckInFlight = false;
 
   function applyTheme(nextTheme: 'light' | 'dark') {
     theme = nextTheme;
@@ -33,22 +34,35 @@
     applyTheme(theme === 'dark' ? 'light' : 'dark');
   }
 
-  function enforceAccess() {
+  async function enforceAccess() {
     if (!browser) return;
-    accessConfigured = isAccessPinConfigured();
+    if (authCheckInFlight) return;
+
     const isLoginPage = $page.url.pathname === '/login';
     const isPublicSharePage = $page.url.pathname.startsWith('/compartilhar/');
-    if (accessConfigured && !hasAccess() && !isLoginPage && !isPublicSharePage) {
-      accessReady = false;
-      goto('/login');
+    if (isPublicSharePage) {
+      accessReady = true;
       return;
     }
-    if (isLoginPage && hasAccess()) {
-      accessReady = false;
-      goto('/');
-      return;
+
+    authCheckInFlight = true;
+    try {
+      const status = await getSessionStatus();
+      accessConfigured = status.configured;
+      if (status.configured && !status.authenticated && !isLoginPage) {
+        accessReady = false;
+        await goto('/login');
+        return;
+      }
+      if (isLoginPage && status.authenticated) {
+        accessReady = false;
+        await goto('/');
+        return;
+      }
+      accessReady = true;
+    } finally {
+      authCheckInFlight = false;
     }
-    accessReady = true;
   }
 
   if (browser) afterNavigate(enforceAccess);
@@ -59,16 +73,16 @@
     const handleOffline = () => (isOnline = false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    enforceAccess();
+    void enforceAccess();
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   });
 
-  function logout() {
-    revokeAccess();
-    goto('/login');
+  async function logout() {
+    await revokeAccess();
+    await goto('/login');
   }
 </script>
 

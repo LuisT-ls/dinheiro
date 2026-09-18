@@ -62,6 +62,15 @@ class AIRequest(StrictModel):
     mensagem: str = Field(..., min_length=1, max_length=5000)
 
 
+class AuthLoginRequest(StrictModel):
+    pin: str = Field(..., min_length=1, max_length=100)
+
+
+class AuthStatusResponse(StrictModel):
+    configured: bool
+    authenticated: bool
+
+
 class SuggestedService(StrictModel):
     service_id: str = Field(..., min_length=1, max_length=150)
     nome: str = Field(..., min_length=1, max_length=150)
@@ -128,3 +137,4 @@ class QuoteResponse(StrictModel):
     atualizado_em: datetime | None = None
     observacoes: str | None = None
     mensagem_whatsapp: str
+    share_token: str | None = None

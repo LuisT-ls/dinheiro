@@ -64,6 +64,12 @@ export interface QuoteResponse {
   atualizado_em?: string | null;
   observacoes?: string | null;
   mensagem_whatsapp: string;
+  share_token?: string | null;
+}
+
+export interface AccessStatus {
+  configured: boolean;
+  authenticated: boolean;
 }
 
 export interface SuggestedService {
@@ -98,6 +104,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
+    credentials: 'include',
     headers,
   });
   const data = await response.json().catch(() => null);
@@ -108,6 +115,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   return data as T;
+}
+
+export function getAccessStatus(): Promise<AccessStatus> {
+  return request<AccessStatus>('/auth/me');
+}
+
+export function loginWithPin(pin: string): Promise<AccessStatus> {
+  return request<AccessStatus>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export function logoutFromApi(): Promise<AccessStatus> {
+  return request<AccessStatus>('/auth/logout', { method: 'POST' });
 }
 
 export function getServices(): Promise<Service[]> {
@@ -171,6 +193,26 @@ export function updateQuoteStatus(id: string, status: QuoteStatus): Promise<Quot
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+}
+
+export function getPublicQuote(id: string, token: string): Promise<QuoteResponse> {
+  return request<QuoteResponse>(
+    `/quotes/public/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,
+  );
+}
+
+export function updatePublicQuoteStatus(
+  id: string,
+  token: string,
+  status: 'aprovado' | 'recusado',
+): Promise<QuoteResponse> {
+  return request<QuoteResponse>(
+    `/quotes/public/${encodeURIComponent(id)}/status?token=${encodeURIComponent(token)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    },
+  );
 }
 
 export function parseClientRequest(mensagem: string): Promise<AIInterpretation> {

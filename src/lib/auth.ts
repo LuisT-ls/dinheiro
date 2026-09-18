@@ -1,27 +1,23 @@
 import { browser } from '$app/environment';
+import { getAccessStatus, loginWithPin, logoutFromApi, type AccessStatus } from '$lib/api';
 
-const ACCESS_SESSION_KEY = 'dinheiro.access.granted';
-const configuredPin = typeof __APP_ACCESS_PIN__ === 'string' ? __APP_ACCESS_PIN__.trim() : '';
+export type { AccessStatus };
 
-export function isAccessPinConfigured() {
-  return configuredPin.length > 0;
-}
+export async function getSessionStatus(): Promise<AccessStatus> {
+  if (!browser) {
+    return { configured: false, authenticated: false };
+  }
 
-export function hasAccess() {
-  if (!browser || !isAccessPinConfigured()) return true;
-  return localStorage.getItem(ACCESS_SESSION_KEY) === 'granted';
-}
-
-export function verifyAccessPin(pin: string) {
-  return !isAccessPinConfigured() || pin.trim() === configuredPin;
-}
-
-export function grantAccess() {
-  if (browser && isAccessPinConfigured()) {
-    localStorage.setItem(ACCESS_SESSION_KEY, 'granted');
+  try {
+    return await getAccessStatus();
+  } catch {
+    // Fail closed if the API is unavailable or the deployment is misconfigured.
+    return { configured: true, authenticated: false };
   }
 }
 
-export function revokeAccess() {
-  if (browser) localStorage.removeItem(ACCESS_SESSION_KEY);
+export { loginWithPin };
+
+export async function revokeAccess(): Promise<void> {
+  await logoutFromApi().catch(() => undefined);
 }

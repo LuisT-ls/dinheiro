@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import db
 from ..schemas import (
@@ -16,10 +16,16 @@ from ..schemas import (
     QuoteStatus,
     QuoteStatusUpdate,
 )
+from ..security import make_share_token, require_authenticated_user, verify_share_token
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/quotes", tags=["Orçamentos"])
+router = APIRouter(
+    prefix="/quotes",
+    tags=["Orçamentos"],
+    dependencies=[Depends(require_authenticated_user)],
+)
+public_router = APIRouter(prefix="/quotes/public", tags=["Orçamentos públicos"])
 COLLECTION_NAME = "quotes"
 
 
@@ -204,6 +210,7 @@ def _quote_payload(
 def _quote_from_snapshot(snapshot) -> QuoteResponse:
     data = snapshot.to_dict() or {}
     data["id"] = snapshot.id
+    data["share_token"] = make_share_token(snapshot.id) or None
     data.setdefault("status", QuoteStatus.RASCUNHO.value)
     data.setdefault("criado_em", getattr(snapshot, "create_time", _utc_now()))
     data.setdefault("observacoes", None)
@@ -259,7 +266,11 @@ def create_quote(quote: QuoteCreate) -> QuoteResponse:
     try:
         document.set(payload)
         return QuoteResponse.model_validate(
-            {**payload, "id": document.id},
+            {
+                **payload,
+                "id": document.id,
+                "share_token": make_share_token(document.id) or None,
+            },
         )
     except Exception as error:
         _raise_firestore_error("criar o orçamento", error)
@@ -342,7 +353,13 @@ def update_quote(quote_id: str, quote: QuoteCreate) -> QuoteResponse:
             updated_at,
         )
         document.set(payload)
-        return QuoteResponse.model_validate({**payload, "id": document.id})
+        return QuoteResponse.model_validate(
+            {
+                **payload,
+                "id": document.id,
+                "share_token": make_share_token(document.id) or None,
+            },
+        )
     except HTTPException:
         raise
     except Exception as error:
@@ -391,6 +408,7 @@ def update_quote_status(
         data = snapshot.to_dict() or {}
         data["id"] = snapshot.id
         data["status"] = status_update.status.value
+        data["share_token"] = make_share_token(snapshot.id) or None
         data.setdefault("criado_em", getattr(snapshot, "create_time", _utc_now()))
         data.setdefault("mensagem_whatsapp", "")
         data.setdefault("custo_interno_total", 0.0)
@@ -404,3 +422,73 @@ def update_quote_status(
         raise
     except Exception as error:
         _raise_firestore_error("atualizar o status do orçamento", error)
+
+
+def _get_public_quote_snapshot(quote_id: str, token: str):
+    if not verify_share_token(quote_id, token):
+        raise HTTPException(
+            status_code=404,
+            detail="Link público inválido ou expirado.",
+        )
+
+    database = _require_db()
+    document = database.collection(COLLECTION_NAME).document(quote_id)
+    snapshot = document.get()
+    if not snapshot.exists:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado.")
+    return document, snapshot
+
+
+def _public_quote_from_snapshot(snapshot) -> QuoteResponse:
+    """Hide internal costs, margins and bearer tokens from client-facing links."""
+
+    quote = _quote_from_snapshot(snapshot)
+    data = quote.model_dump(mode="json")
+    data["custo_interno_total"] = 0.0
+    data["margem_bruta"] = 0.0
+    data["margem_percentual"] = 0.0
+    data["share_token"] = None
+    for item in data.get("itens", []):
+        item["custo_interno"] = 0.0
+        item["margem_bruta"] = 0.0
+    return QuoteResponse.model_validate(data)
+
+
+@public_router.get("/{quote_id}", response_model=QuoteResponse)
+def get_public_quote(
+    quote_id: str,
+    token: str = Query(..., min_length=20),
+) -> QuoteResponse:
+    """Read-only quote view used by a signed client-sharing link."""
+
+    try:
+        _document, snapshot = _get_public_quote_snapshot(quote_id, token)
+        return _public_quote_from_snapshot(snapshot)
+    except HTTPException:
+        raise
+    except Exception as error:
+        _raise_firestore_error("buscar o orçamento compartilhado", error)
+
+
+@public_router.patch("/{quote_id}/status", response_model=QuoteResponse)
+def update_public_quote_status(
+    quote_id: str,
+    status_update: QuoteStatusUpdate,
+    token: str = Query(..., min_length=20),
+) -> QuoteResponse:
+    """Allow a recipient to accept or decline a quote from its share link."""
+
+    if status_update.status not in {QuoteStatus.APROVADO, QuoteStatus.RECUSADO}:
+        raise HTTPException(
+            status_code=400,
+            detail="O cliente só pode aprovar ou recusar o orçamento por este link.",
+        )
+
+    try:
+        document, _snapshot = _get_public_quote_snapshot(quote_id, token)
+        document.update({"status": status_update.status.value, "atualizado_em": _utc_now()})
+        return _public_quote_from_snapshot(document.get())
+    except HTTPException:
+        raise
+    except Exception as error:
+        _raise_firestore_error("atualizar o status do orçamento compartilhado", error)

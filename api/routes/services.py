@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import db
 from ..schemas import (
@@ -14,10 +14,15 @@ from ..schemas import (
     ServiceCreate,
     ServiceResponse,
 )
+from ..security import require_authenticated_user
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/services", tags=["Serviços"])
+router = APIRouter(
+    prefix="/services",
+    tags=["Serviços"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 COLLECTION_NAME = "services"
 
 

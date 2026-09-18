@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..config import db
 from ..schemas import AIInterpretation, AIRequest
+from ..rate_limit import enforce_rate_limit
+from ..security import require_authenticated_user
 from ..services.gemini_service import interpretar_pedido_cliente
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/ai", tags=["IA"])
+router = APIRouter(
+    prefix="/ai",
+    tags=["IA"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 COLLECTION_NAME = "services"
 
 
@@ -37,9 +43,10 @@ def _active_services(database) -> list[dict]:
 
 
 @router.post("/parse-request", response_model=AIInterpretation)
-def parse_request(payload: AIRequest) -> AIInterpretation:
+def parse_request(request: Request, payload: AIRequest) -> AIInterpretation:
     """Parse a free-form client message and suggest catalog services."""
 
+    enforce_rate_limit(request, "ai-parse-request", limit=20, window_seconds=60)
     database = _require_db()
     try:
         catalogo = _active_services(database)

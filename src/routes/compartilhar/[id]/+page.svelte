@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { getQuote, updateQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
+  import { getPublicQuote, updatePublicQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
   import { getBusinessSettings, type BusinessSettings } from '$lib/settings';
   import Seo from '$lib/Seo.svelte';
@@ -12,11 +12,18 @@
   let error = '';
   let updating = false;
   let feedback = '';
+  let shareToken = '';
 
   onMount(async () => {
     business = getBusinessSettings();
+    shareToken = $page.url.searchParams.get('token') ?? '';
+    if (!shareToken) {
+      error = 'Este link público é inválido ou está incompleto.';
+      loading = false;
+      return;
+    }
     try {
-      quote = await getQuote($page.params.id);
+      quote = await getPublicQuote($page.params.id, shareToken);
     } catch (reason) {
       error = reason instanceof Error ? reason.message : 'Não foi possível carregar esta proposta.';
     } finally {
@@ -40,7 +47,7 @@
     if (!quote || updating) return;
     updating = true;
     try {
-      quote = await updateQuoteStatus(quote.id, status);
+      quote = await updatePublicQuoteStatus(quote.id, shareToken, status);
       feedback = status === 'aprovado' ? 'Obrigado! A aprovação foi registrada.' : 'Sua resposta foi registrada. Entraremos em contato.';
     } catch (reason) {
       error = reason instanceof Error ? reason.message : 'Não foi possível registrar sua resposta.';
