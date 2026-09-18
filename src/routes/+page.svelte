@@ -504,7 +504,11 @@
   }
 </script>
 
-<Seo title="Novo orçamento | Dinheiro" description="Monte, revise e compartilhe orçamentos técnicos em poucos minutos." />
+<Seo
+  title="Orçamentos técnicos profissionais | Dinheiro"
+  description="Crie, personalize e compartilhe orçamentos técnicos profissionais para serviços de tecnologia, desenvolvimento e assistência."
+  noindex={false}
+/>
 
 <div class="space-y-8">
   {#if draftMode !== 'new'}

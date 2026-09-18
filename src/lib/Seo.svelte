@@ -14,6 +14,8 @@
     '@type': 'WebApplication',
     name: 'Dinheiro',
     description,
+    url: canonicalUrl,
+    inLanguage: 'pt-BR',
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
   };

@@ -1,2 +1,11 @@
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /api/
+Disallow: /historico
+Disallow: /dashboard
+Disallow: /servicos
+Disallow: /configuracoes
+Disallow: /login
+Disallow: /compartilhar/
+
+Sitemap: https://meusorcamentos.vercel.app/sitemap.xml
