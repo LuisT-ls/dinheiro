@@ -4,6 +4,10 @@
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
   import Seo from '$lib/Seo.svelte';
 
+  function handleGlobalKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') closeDeleteDialog();
+  }
+
   type FilterStatus = QuoteStatus | 'todos';
 
   const statuses: { value: QuoteStatus; label: string }[] = [
@@ -27,6 +31,7 @@
   let lastUpdated = '';
   let expandedHistoryId = '';
   let restoringRevisionId = '';
+  let quotePendingDeletion: QuoteResponse | null = null;
 
   $: normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
   $: filteredQuotes = quotes.filter((quote) => {
@@ -170,9 +175,19 @@
     }
   }
 
-  async function removeQuote(quote: QuoteResponse) {
-    if (!window.confirm(`Deseja realmente excluir o orçamento de ${quote.cliente.nome}?`)) return;
+  function requestDelete(quote: QuoteResponse) {
+    quotePendingDeletion = quote;
+  }
 
+  function closeDeleteDialog() {
+    if (!deletingId) quotePendingDeletion = null;
+  }
+
+  async function confirmDelete() {
+    const quote = quotePendingDeletion;
+    if (!quote) return;
+
+    quotePendingDeletion = null;
     deletingId = quote.id;
     error = '';
     try {
@@ -240,6 +255,8 @@
   }
 </script>
 
+<svelte:window on:keydown={handleGlobalKeydown} />
+
 <Seo title="Histórico de orçamentos | Dinheiro" description="Acompanhe propostas, negociações, status e próximos passos em um só lugar." />
 
 <div class="space-y-7 pb-4">
@@ -257,6 +274,33 @@
 
   {#if error}<div class="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"><span class="mt-0.5">!</span><span>{error}</span></div>{/if}
   {#if toast}<div class="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-xl"><span class="grid h-5 w-5 place-items-center rounded-full bg-emerald-400 text-[11px] text-slate-950">✓</span>{toast}</div>{/if}
+
+  {#if quotePendingDeletion}
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm" role="presentation">
+      <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
+        <div class="flex items-start gap-3">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-100 text-xl text-rose-600" aria-hidden="true">!</span>
+          <div class="min-w-0">
+            <h2 id="delete-dialog-title" class="text-lg font-extrabold tracking-tight text-slate-950">Excluir este orçamento?</h2>
+            <p id="delete-dialog-description" class="mt-1 text-sm leading-6 text-slate-500">Você está prestes a remover esta proposta da lista principal.</p>
+          </div>
+        </div>
+
+        <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0"><p class="truncate text-sm font-bold text-slate-800">{quotePendingDeletion.cliente.nome}</p><p class="mt-1 text-xs text-slate-500">{shortId(quotePendingDeletion.id)} · {quotePendingDeletion.itens.length} serviço{quotePendingDeletion.itens.length === 1 ? '' : 's'}</p></div>
+            <p class="shrink-0 text-sm font-extrabold text-slate-900">{money(quotePendingDeletion.valor_total)}</p>
+          </div>
+          <p class="mt-3 border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500">A versão atual ficará guardada no histórico de alterações e poderá ser restaurada depois.</p>
+        </div>
+
+        <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900" on:click={closeDeleteDialog}>Cancelar</button>
+          <button type="button" class="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700" on:click={confirmDelete}>Excluir orçamento</button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     <div class="surface flex items-start justify-between p-4 sm:p-5">
@@ -388,7 +432,7 @@
                 <button type="button" class="action-button action-pdf" on:click={() => gerarOrcamentoPDF(quote)} title="Baixar PDF">↓ <span>PDF</span></button>
                 <button type="button" class="action-button" on:click={() => copyShareLink(quote)} title="Copiar link público">⌁ <span>Link</span></button>
                 <button type="button" class="action-button action-whatsapp disabled:cursor-not-allowed disabled:opacity-40" on:click={() => resendWhatsApp(quote)} disabled={!quote.cliente.telefone} title={quote.cliente.telefone ? 'Reenviar pelo WhatsApp' : 'Telefone não informado'}>↗ <span>WhatsApp</span></button>
-                <button type="button" class="action-button action-delete disabled:cursor-not-allowed disabled:opacity-50" on:click={() => removeQuote(quote)} disabled={deletingId === quote.id} title="Excluir orçamento">⌫ <span>{deletingId === quote.id ? 'Excluindo...' : 'Excluir'}</span></button>
+                <button type="button" class="action-button action-delete disabled:cursor-not-allowed disabled:opacity-50" on:click={() => requestDelete(quote)} disabled={deletingId === quote.id} title="Excluir orçamento">⌫ <span>{deletingId === quote.id ? 'Excluindo...' : 'Excluir'}</span></button>
                 {#if historyFor(quote.id).length > 0}<button type="button" class="action-button action-history" on:click={() => (expandedHistoryId = expandedHistoryId === quote.id ? '' : quote.id)} title="Ver histórico de alterações">◷ <span>{expandedHistoryId === quote.id ? 'Fechar histórico' : 'Histórico'}</span></button>{/if}
               </div>
             </div>
