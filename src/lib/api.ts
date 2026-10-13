@@ -1,6 +1,7 @@
 export type ServiceCategory = 'dev' | 'hardware' | 'infra' | 'outros';
 export type PricingType = 'fixo' | 'hora' | 'misto';
 export type QuoteStatus = 'rascunho' | 'enviado' | 'negociacao' | 'aprovado' | 'recusado' | 'concluido';
+export type QuoteRevisionAction = 'edicao' | 'status' | 'exclusao' | 'restauracao';
 
 export interface Service {
   id: string;
@@ -65,6 +66,17 @@ export interface QuoteResponse {
   observacoes?: string | null;
   mensagem_whatsapp: string;
   share_token?: string | null;
+}
+
+export interface QuoteRevision {
+  id: string;
+  quote_id: string;
+  acao: QuoteRevisionAction;
+  alterado_em: string;
+  cliente: ClientInfo;
+  valor_total: number;
+  status: QuoteStatus;
+  quantidade_itens: number;
 }
 
 export interface AccessStatus {
@@ -193,6 +205,22 @@ export function updateQuoteStatus(id: string, status: QuoteStatus): Promise<Quot
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+}
+
+export function getQuoteHistory(id?: string): Promise<QuoteRevision[]> {
+  const query = id ? `?quote_id=${encodeURIComponent(id)}` : '';
+  return request<QuoteRevision[]>(`/quote-history${query}`);
+}
+
+export function getQuoteRevisions(id: string): Promise<QuoteRevision[]> {
+  return request<QuoteRevision[]>(`/quotes/${encodeURIComponent(id)}/history`);
+}
+
+export function restoreQuote(id: string, revisionId: string): Promise<QuoteResponse> {
+  return request<QuoteResponse>(
+    `/quotes/${encodeURIComponent(id)}/restore/${encodeURIComponent(revisionId)}`,
+    { method: 'POST' },
+  );
 }
 
 export function getPublicQuote(id: string, token: string): Promise<QuoteResponse> {

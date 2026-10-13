@@ -35,6 +35,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(services.router, prefix="/api")
 app.include_router(quotes.router, prefix="/api")
+app.include_router(quotes.history_router, prefix="/api")
 app.include_router(quotes.public_router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 

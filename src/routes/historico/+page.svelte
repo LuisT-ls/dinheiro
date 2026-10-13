@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { deleteQuote, getQuotes, updateQuoteStatus, type QuoteResponse, type QuoteStatus } from '$lib/api';
+  import { deleteQuote, getQuoteHistory, getQuotes, restoreQuote, updateQuoteStatus, type QuoteResponse, type QuoteRevision, type QuoteStatus } from '$lib/api';
   import { gerarOrcamentoPDF } from '$lib/pdfGenerator';
   import Seo from '$lib/Seo.svelte';
 
@@ -16,6 +16,7 @@
   ];
 
   let quotes: QuoteResponse[] = [];
+  let revisions: QuoteRevision[] = [];
   let loading = true;
   let error = '';
   let query = '';
@@ -24,6 +25,8 @@
   let deletingId = '';
   let toast = '';
   let lastUpdated = '';
+  let expandedHistoryId = '';
+  let restoringRevisionId = '';
 
   $: normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
   $: filteredQuotes = quotes.filter((quote) => {
@@ -48,6 +51,9 @@
     .reduce((sum, quote) => sum + quote.valor_total, 0);
   $: attentionCount = quotes.filter((quote) => quote.status === 'rascunho' || quote.status === 'enviado' || quote.status === 'negociacao').length;
   $: hasFilters = Boolean(normalizedQuery) || filterStatus !== 'todos';
+  $: deletedRevisions = revisions
+    .filter((revision) => revision.acao === 'exclusao' && !quotes.some((quote) => quote.id === revision.quote_id))
+    .filter((revision, index, all) => all.findIndex((item) => item.quote_id === revision.quote_id) === index);
 
   onMount(() => {
     const requestedStatus = new URLSearchParams(window.location.search).get('status') as QuoteStatus | null;
@@ -61,7 +67,9 @@
     loading = true;
     error = '';
     try {
-      quotes = await getQuotes();
+      const [loadedQuotes, loadedRevisions] = await Promise.all([getQuotes(), getQuoteHistory()]);
+      quotes = loadedQuotes;
+      revisions = loadedRevisions;
       lastUpdated = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
     } catch (reason) {
       error = reason instanceof Error ? reason.message : 'Não foi possível carregar o histórico.';
@@ -110,6 +118,24 @@
     }[status];
   }
 
+  function revisionLabel(action: QuoteRevision['acao']) {
+    return {
+      edicao: 'Edição salva',
+      status: 'Status alterado',
+      exclusao: 'Orçamento excluído',
+      restauracao: 'Orçamento restaurado',
+    }[action];
+  }
+
+  function revisionDotClass(action: QuoteRevision['acao']) {
+    return {
+      edicao: 'bg-indigo-500',
+      status: 'bg-amber-500',
+      exclusao: 'bg-rose-500',
+      restauracao: 'bg-emerald-500',
+    }[action];
+  }
+
   function countFor(status: FilterStatus) {
     return status === 'todos' ? quotes.length : quotes.filter((quote) => quote.status === status).length;
   }
@@ -152,12 +178,36 @@
     try {
       await deleteQuote(quote.id);
       quotes = quotes.filter((item) => item.id !== quote.id);
+      revisions = await getQuoteHistory();
       toast = 'Orçamento removido com sucesso.';
       window.setTimeout(() => (toast = ''), 3500);
     } catch (reason) {
       error = reason instanceof Error ? reason.message : 'Não foi possível excluir o orçamento.';
     } finally {
       deletingId = '';
+    }
+  }
+
+  function historyFor(quoteId: string) {
+    return revisions.filter((revision) => revision.quote_id === quoteId).slice(0, 6);
+  }
+
+  async function restoreRevision(revision: QuoteRevision) {
+    if (!window.confirm(`Restaurar a versão de ${revision.cliente.nome} de ${formatDate(revision.alterado_em)}?`)) return;
+
+    restoringRevisionId = revision.id;
+    error = '';
+    try {
+      const restored = await restoreQuote(revision.quote_id, revision.id);
+      quotes = [restored, ...quotes.filter((quote) => quote.id !== restored.id)];
+      revisions = await getQuoteHistory();
+      expandedHistoryId = restored.id;
+      toast = 'Versão restaurada com sucesso.';
+      window.setTimeout(() => (toast = ''), 3500);
+    } catch (reason) {
+      error = reason instanceof Error ? reason.message : 'Não foi possível restaurar a versão.';
+    } finally {
+      restoringRevisionId = '';
     }
   }
 
@@ -226,6 +276,30 @@
       <span class="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-lg text-emerald-600">✓</span>
     </div>
   </section>
+
+  {#if deletedRevisions.length > 0}
+    <section class="surface border-rose-200/80 bg-rose-50/40 p-4 sm:p-5">
+      <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+        <div>
+          <p class="eyebrow text-rose-600">Recuperação</p>
+          <h2 class="mt-1 text-base font-bold text-slate-900">Orçamentos excluídos recentemente</h2>
+          <p class="mt-1 text-xs leading-5 text-slate-500">As versões ficam guardadas para você desfazer uma exclusão por engano.</p>
+        </div>
+        <span class="text-xs font-semibold text-rose-600">{deletedRevisions.length} recuperável{deletedRevisions.length === 1 ? '' : 'eis'}</span>
+      </div>
+      <div class="mt-4 grid gap-2 lg:grid-cols-2">
+        {#each deletedRevisions as revision}
+          <div class="flex flex-col gap-3 rounded-xl border border-rose-200 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-bold text-slate-800">{revision.cliente.nome}</p>
+              <p class="mt-1 text-xs text-slate-500">{revision.quantidade_itens} serviço{revision.quantidade_itens === 1 ? '' : 's'} · {money(revision.valor_total)} · excluído em {formatDate(revision.alterado_em)}</p>
+            </div>
+            <button type="button" class="action-button action-restore shrink-0" on:click={() => restoreRevision(revision)} disabled={restoringRevisionId === revision.id}>{restoringRevisionId === revision.id ? 'Restaurando...' : '↶ Restaurar'}</button>
+          </div>
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   <section class="surface p-4 sm:p-5">
     <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -315,8 +389,29 @@
                 <button type="button" class="action-button" on:click={() => copyShareLink(quote)} title="Copiar link público">⌁ <span>Link</span></button>
                 <button type="button" class="action-button action-whatsapp disabled:cursor-not-allowed disabled:opacity-40" on:click={() => resendWhatsApp(quote)} disabled={!quote.cliente.telefone} title={quote.cliente.telefone ? 'Reenviar pelo WhatsApp' : 'Telefone não informado'}>↗ <span>WhatsApp</span></button>
                 <button type="button" class="action-button action-delete disabled:cursor-not-allowed disabled:opacity-50" on:click={() => removeQuote(quote)} disabled={deletingId === quote.id} title="Excluir orçamento">⌫ <span>{deletingId === quote.id ? 'Excluindo...' : 'Excluir'}</span></button>
+                {#if historyFor(quote.id).length > 0}<button type="button" class="action-button action-history" on:click={() => (expandedHistoryId = expandedHistoryId === quote.id ? '' : quote.id)} title="Ver histórico de alterações">◷ <span>{expandedHistoryId === quote.id ? 'Fechar histórico' : 'Histórico'}</span></button>{/if}
               </div>
             </div>
+
+            {#if expandedHistoryId === quote.id && historyFor(quote.id).length > 0}
+              <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div><p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Linha do tempo</p><p class="mt-1 text-xs text-slate-400">Restaure uma versão anterior se precisar desfazer uma alteração.</p></div>
+                  <span class="text-[11px] font-semibold text-slate-400">{historyFor(quote.id).length} registros</span>
+                </div>
+                <div class="mt-4 space-y-3">
+                  {#each historyFor(quote.id) as revision}
+                    <div class="flex gap-3">
+                      <span class={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${revisionDotClass(revision.acao)}`}></span>
+                      <div class="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                        <div><p class="text-xs font-bold text-slate-700">{revisionLabel(revision.acao)}</p><p class="mt-0.5 text-[11px] text-slate-500">{formatDate(revision.alterado_em)} · {statusLabel(revision.status)} · {money(revision.valor_total)}</p></div>
+                        <button type="button" class="mt-2 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 sm:mt-0" on:click={() => restoreRevision(revision)} disabled={restoringRevisionId === revision.id}>{restoringRevisionId === revision.id ? 'Restaurando...' : 'Restaurar esta versão'}</button>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           </article>
         {/each}
       </div>
@@ -359,6 +454,14 @@
 
   .action-delete {
     @apply border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100;
+  }
+
+  .action-history {
+    @apply border-slate-300 bg-slate-50 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+  }
+
+  .action-restore {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100;
   }
 
   .pipeline-stage {

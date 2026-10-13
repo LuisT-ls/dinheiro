@@ -119,6 +119,24 @@ class QuoteStatusUpdate(StrictModel):
     status: QuoteStatus
 
 
+class QuoteRevisionAction(str, Enum):
+    EDICAO = "edicao"
+    STATUS = "status"
+    EXCLUSAO = "exclusao"
+    RESTAURACAO = "restauracao"
+
+
+class QuoteRevisionResponse(StrictModel):
+    id: str = Field(..., min_length=1)
+    quote_id: str = Field(..., min_length=1)
+    acao: QuoteRevisionAction
+    alterado_em: datetime
+    cliente: ClientInfo
+    valor_total: float
+    status: QuoteStatus
+    quantidade_itens: int = Field(..., ge=0)
+
+
 class QuoteResponse(StrictModel):
     id: str = Field(..., min_length=1)
     cliente: ClientInfo

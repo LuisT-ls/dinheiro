@@ -12,6 +12,8 @@ from ..schemas import (
     QuoteCreate,
     QuoteItemInput,
     QuoteItemResponse,
+    QuoteRevisionAction,
+    QuoteRevisionResponse,
     QuoteResponse,
     QuoteStatus,
     QuoteStatusUpdate,
@@ -26,7 +28,13 @@ router = APIRouter(
     dependencies=[Depends(require_authenticated_user)],
 )
 public_router = APIRouter(prefix="/quotes/public", tags=["Orçamentos públicos"])
+history_router = APIRouter(
+    prefix="/quote-history",
+    tags=["Histórico de alterações"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 COLLECTION_NAME = "quotes"
+REVISION_COLLECTION_NAME = "quote_revisions"
 
 
 def _require_db():
@@ -208,20 +216,63 @@ def _quote_payload(
 
 
 def _quote_from_snapshot(snapshot) -> QuoteResponse:
-    data = snapshot.to_dict() or {}
-    data["id"] = snapshot.id
-    data["share_token"] = make_share_token(snapshot.id) or None
+    return _quote_from_data(
+        snapshot.to_dict() or {},
+        snapshot.id,
+        getattr(snapshot, "create_time", None),
+    )
+
+
+def _quote_from_data(
+    raw_data: dict,
+    quote_id: str,
+    fallback_created_at: datetime | None = None,
+) -> QuoteResponse:
+    data = dict(raw_data)
+    data["id"] = quote_id
+    data["share_token"] = make_share_token(quote_id) or None
     data.setdefault("status", QuoteStatus.RASCUNHO.value)
-    data.setdefault("criado_em", getattr(snapshot, "create_time", _utc_now()))
+    data.setdefault("criado_em", fallback_created_at or _utc_now())
     data.setdefault("observacoes", None)
     data.setdefault("mensagem_whatsapp", "")
     data.setdefault("custo_interno_total", 0.0)
     data.setdefault("margem_bruta", _money(data.get("total_mao_de_obra", 0) - data.get("custo_interno_total", 0)))
     data.setdefault("margem_percentual", _money(data["margem_bruta"] / data["total_mao_de_obra"] * 100) if data.get("total_mao_de_obra", 0) else 0.0)
-    for item in data.get("itens", []):
+    data["itens"] = [dict(item) for item in data.get("itens", [])]
+    for item in data["itens"]:
         item.setdefault("custo_interno", 0.0)
         item.setdefault("margem_bruta", _money(item.get("subtotal", 0) - item.get("custo_peca", 0) - item.get("custo_interno", 0)))
     return QuoteResponse.model_validate(data)
+
+
+def _revision_payload(
+    quote_id: str,
+    action: QuoteRevisionAction,
+    quote_data: dict,
+    changed_at: datetime,
+) -> dict:
+    return {
+        "quote_id": quote_id,
+        "acao": action.value,
+        "alterado_em": changed_at,
+        "snapshot": quote_data,
+    }
+
+
+def _revision_from_snapshot(snapshot) -> QuoteRevisionResponse:
+    data = snapshot.to_dict() or {}
+    quote_data = data.get("snapshot") or {}
+    quote = _quote_from_data(quote_data, data.get("quote_id", ""))
+    return QuoteRevisionResponse(
+        id=snapshot.id,
+        quote_id=data.get("quote_id", ""),
+        acao=data.get("acao", QuoteRevisionAction.EDICAO.value),
+        alterado_em=data.get("alterado_em", _utc_now()),
+        cliente=quote.cliente,
+        valor_total=quote.valor_total,
+        status=quote.status,
+        quantidade_itens=len(quote.itens),
+    )
 
 
 def _raise_firestore_error(operation: str, error: Exception) -> None:
@@ -352,7 +403,19 @@ def update_quote(quote_id: str, quote: QuoteCreate) -> QuoteResponse:
             total_internal_cost,
             updated_at,
         )
-        document.set(payload)
+        revision_document = database.collection(REVISION_COLLECTION_NAME).document()
+        batch = database.batch()
+        batch.set(document, payload)
+        batch.set(
+            revision_document,
+            _revision_payload(
+                quote_id,
+                QuoteRevisionAction.EDICAO,
+                current_data,
+                updated_at,
+            ),
+        )
+        batch.commit()
         return QuoteResponse.model_validate(
             {
                 **payload,
@@ -378,7 +441,20 @@ def delete_quote(quote_id: str) -> dict[str, object]:
         if not snapshot.exists:
             raise HTTPException(status_code=404, detail="Orçamento não encontrado.")
 
-        document.delete()
+        deleted_at = _utc_now()
+        revision_document = database.collection(REVISION_COLLECTION_NAME).document()
+        batch = database.batch()
+        batch.set(
+            revision_document,
+            _revision_payload(
+                quote_id,
+                QuoteRevisionAction.EXCLUSAO,
+                snapshot.to_dict() or {},
+                deleted_at,
+            ),
+        )
+        batch.delete(document)
+        batch.commit()
         return {
             "success": True,
             "message": "Orçamento removido com sucesso",
@@ -404,20 +480,28 @@ def update_quote_status(
         if not snapshot.exists:
             raise HTTPException(status_code=404, detail="Orçamento não encontrado.")
 
-        document.update({"status": status_update.status.value})
-        data = snapshot.to_dict() or {}
-        data["id"] = snapshot.id
-        data["status"] = status_update.status.value
-        data["share_token"] = make_share_token(snapshot.id) or None
-        data.setdefault("criado_em", getattr(snapshot, "create_time", _utc_now()))
-        data.setdefault("mensagem_whatsapp", "")
-        data.setdefault("custo_interno_total", 0.0)
-        data.setdefault("margem_bruta", _money(data.get("total_mao_de_obra", 0) - data.get("custo_interno_total", 0)))
-        data.setdefault("margem_percentual", _money(data["margem_bruta"] / data["total_mao_de_obra"] * 100) if data.get("total_mao_de_obra", 0) else 0.0)
-        for item in data.get("itens", []):
-            item.setdefault("custo_interno", 0.0)
-            item.setdefault("margem_bruta", _money(item.get("subtotal", 0) - item.get("custo_peca", 0) - item.get("custo_interno", 0)))
-        return QuoteResponse.model_validate(data)
+        current_data = snapshot.to_dict() or {}
+        if current_data.get("status") == status_update.status.value:
+            return _quote_from_data(current_data, snapshot.id)
+
+        changed_at = _utc_now()
+        updated_data = dict(current_data)
+        updated_data["status"] = status_update.status.value
+        updated_data["atualizado_em"] = changed_at
+        revision_document = database.collection(REVISION_COLLECTION_NAME).document()
+        batch = database.batch()
+        batch.set(document, updated_data)
+        batch.set(
+            revision_document,
+            _revision_payload(
+                quote_id,
+                QuoteRevisionAction.STATUS,
+                current_data,
+                changed_at,
+            ),
+        )
+        batch.commit()
+        return _quote_from_data(updated_data, snapshot.id)
     except HTTPException:
         raise
     except Exception as error:
@@ -485,10 +569,107 @@ def update_public_quote_status(
         )
 
     try:
-        document, _snapshot = _get_public_quote_snapshot(quote_id, token)
-        document.update({"status": status_update.status.value, "atualizado_em": _utc_now()})
+        document, snapshot = _get_public_quote_snapshot(quote_id, token)
+        database = _require_db()
+        current_data = snapshot.to_dict() or {}
+        changed_at = _utc_now()
+        updated_data = dict(current_data)
+        updated_data["status"] = status_update.status.value
+        updated_data["atualizado_em"] = changed_at
+        revision_document = database.collection(REVISION_COLLECTION_NAME).document()
+        batch = database.batch()
+        batch.set(document, updated_data)
+        batch.set(
+            revision_document,
+            _revision_payload(
+                quote_id,
+                QuoteRevisionAction.STATUS,
+                current_data,
+                changed_at,
+            ),
+        )
+        batch.commit()
         return _public_quote_from_snapshot(document.get())
     except HTTPException:
         raise
     except Exception as error:
         _raise_firestore_error("atualizar o status do orçamento compartilhado", error)
+
+
+@router.get("/{quote_id}/history", response_model=list[QuoteRevisionResponse])
+def list_quote_history(quote_id: str) -> list[QuoteRevisionResponse]:
+    """List the saved revisions for one quote, newest first."""
+
+    database = _require_db()
+    try:
+        revisions = [
+            _revision_from_snapshot(snapshot)
+            for snapshot in database.collection(REVISION_COLLECTION_NAME)
+            .where("quote_id", "==", quote_id)
+            .stream()
+        ]
+        return sorted(revisions, key=lambda revision: revision.alterado_em, reverse=True)
+    except Exception as error:
+        _raise_firestore_error("listar o histórico do orçamento", error)
+
+
+@router.post("/{quote_id}/restore/{revision_id}", response_model=QuoteResponse)
+def restore_quote(quote_id: str, revision_id: str) -> QuoteResponse:
+    """Restore a previous revision, including a quote that was deleted."""
+
+    database = _require_db()
+    quote_document = database.collection(COLLECTION_NAME).document(quote_id)
+    revision_document = database.collection(REVISION_COLLECTION_NAME).document(revision_id)
+
+    try:
+        revision_snapshot = revision_document.get()
+        if not revision_snapshot.exists:
+            raise HTTPException(status_code=404, detail="Versão do orçamento não encontrada.")
+
+        revision_data = revision_snapshot.to_dict() or {}
+        if revision_data.get("quote_id") != quote_id:
+            raise HTTPException(status_code=404, detail="Versão do orçamento não encontrada.")
+
+        previous_snapshot = quote_document.get()
+        restore_data = dict(revision_data.get("snapshot") or {})
+        if not restore_data:
+            raise HTTPException(status_code=422, detail="A versão selecionada não possui dados para restauração.")
+
+        restored_at = _utc_now()
+        restore_data["atualizado_em"] = restored_at
+        audit_snapshot = previous_snapshot.to_dict() if previous_snapshot.exists else restore_data
+        new_revision_document = database.collection(REVISION_COLLECTION_NAME).document()
+        batch = database.batch()
+        batch.set(quote_document, restore_data)
+        batch.set(
+            new_revision_document,
+            _revision_payload(
+                quote_id,
+                QuoteRevisionAction.RESTAURACAO,
+                audit_snapshot or {},
+                restored_at,
+            ),
+        )
+        batch.commit()
+        return _quote_from_data(restore_data, quote_id)
+    except HTTPException:
+        raise
+    except Exception as error:
+        _raise_firestore_error("restaurar o orçamento", error)
+
+
+@history_router.get("", response_model=list[QuoteRevisionResponse])
+def list_all_quote_history(
+    quote_id: str | None = Query(default=None),
+) -> list[QuoteRevisionResponse]:
+    """List the audit trail, including revisions of deleted quotes."""
+
+    database = _require_db()
+    try:
+        query = database.collection(REVISION_COLLECTION_NAME)
+        if quote_id:
+            query = query.where("quote_id", "==", quote_id)
+        revisions = [_revision_from_snapshot(snapshot) for snapshot in query.stream()]
+        return sorted(revisions, key=lambda revision: revision.alterado_em, reverse=True)
+    except Exception as error:
+        _raise_firestore_error("listar o histórico de alterações", error)
